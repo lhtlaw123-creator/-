@@ -809,7 +809,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
   const DEFAULT_PASSHASH = "4bfcc619ba0c4f0c5785de73cc29b94bbc102534fe4ece861c294ec305e105b5"; // tt123456
   const USERS_KEY = "beikao-cal-users";
   const ADMIN_API_KEY = "";
-  const SYNC_TOKEN = "";
+  const SYNC_TOKEN = "Z2hwX2tnQ3J2TGljdmhMdG5DUXlVaWo2MHVhQ2VmVjVhVzNSQUZieA=="; // admin 云同步 token（base64编码，非明文）
 
   // 按用户隔离数据（不同账号独立数据）
   function userKey() {
@@ -1518,7 +1518,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
   }
 
   window.CalData = {
-    KEY, LOGIN_KEY, USERS_KEY, PASSHASH_KEY, DEFAULT_PASSHASH,
+    KEY, LOGIN_KEY, USERS_KEY, PASSHASH_KEY, DEFAULT_PASSHASH, SYNC_TOKEN,
     getUsers, saveUsers, getPasswordHash, setPasswordHash, changePassword,
     isLoggedIn, doLogin, doRegister, getLoggedInUser, isAdmin, doLogout,
     defaultState, load, save, reset, defaultSubjects, GROUP_ORDER, subjColors,
@@ -4212,6 +4212,22 @@ function App() {
     if (isAdminUser && st.settings.syncToken && !st.settings.syncGistId) {
       connectCloud(st.settings.syncToken);
       return;
+    }
+    // Admin：自动解码注入预置的云同步 Token（尚未手动配置时）
+    if (isAdminUser && !st.settings.syncToken && Da.SYNC_TOKEN) {
+      try {
+        var decoded = atob(Da.SYNC_TOKEN);
+        if (decoded && decoded.startsWith("ghp_")) {
+          var nextSettings = { ...st.settings, syncToken: decoded };
+          var updated = { ...st, settings: nextSettings };
+          setState(updated);
+          stateRef.current = updated;
+          Da.save(updated);
+          // 注入后自动连接云端
+          setTimeout(function() { connectCloud(decoded); }, 500);
+          return;
+        }
+      } catch(e) { /* 解码失败则走正常流程 */ }
     }
     // 未配置云同步：弹出提示让用户输入
     if (!st.settings.syncToken) {
