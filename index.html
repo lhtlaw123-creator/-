@@ -601,10 +601,139 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
 }
 
 @media (max-width: 760px) {
-  .sidebar { position: fixed; z-index: 50; height: 100vh; box-shadow: var(--shadow-lg); }
+  .sidebar { position: fixed; z-index: 50; height: 100vh; box-shadow: var(--shadow-lg); left: -100vw; width: 100vw; transition: left 0.3s var(--ease); }
+  .sidebar:not(.collapsed) { left: 0; }
   .period-label { min-width: auto; }
   .brand-sub { display: none; }
+
+  /* 顶栏压缩 */
+  .topbar { padding: 9px 10px; gap: 5px; }
+  .brand { gap: 6px; }
+  .brand-mark { width: 26px; height: 26px; border-radius: 8px; }
+  .brand-mark::after { width: 10px; height: 10px; border-radius: 4px; }
+  .brand-name { font-size: 15px; }
+  .segment button { padding: 5px 11px; font-size: 12px; }
+  .btn { padding: 6px 11px; font-size: 12px; }
+  .btn-ai { padding: 5px 10px; font-size: 11.5px; }
+  .icon-btn { width: 30px; height: 30px; font-size: 15px; }
+  .period-label { font-size: 15px; }
+  .btn-today { padding: 5px 10px; font-size: 12px; }
+
+  /* 日历网格缩小 */
+  .month { padding: 8px 6px 12px; }
+  .monthgrid { gap: 4px; }
+  .daycell { padding: 5px 4px; border-radius: var(--r-sm); min-height: 52px; }
+  .dc-num { font-size: 11.5px; }
+  .dc-num.todaynum { width: 22px; height: 22px; font-size: 11.5px; }
+  .dc-min { font-size: 9.5px; }
+  .dc-event { font-size: 10px; padding: 2px 4px; gap: 3px; margin-top: 1px; }
+  .dc-event .de-dot { width: 5px; height: 5px; }
+  .dc-more { font-size: 9.5px; }
+  .weekhead div { font-size: 10.5px; padding: 1px 0; }
+
+  /* 时间线适配 */
+  .tl-col.day { flex: 1; min-width: auto; }
+  .tl-col.day .tl-head { font-size: 12px; padding: 8px 6px; }
+  .tl-event { padding: 6px 8px; font-size: 11.5px; }
+  .tl-event .te-title { font-size: 11.5px; }
+  .tl-event .te-meta { font-size: 10px; }
+
+  /* 模态/抽屉全宽 */
+  .modal { width: 96vw; max-width: 96vw; border-radius: var(--r-lg); }
+  .modal-head { padding: 16px 18px 12px; }
+  .modal-title { font-size: 18px; }
+  .modal-body { padding: 16px 18px 22px; }
+  .drawer { width: 100vw; max-width: 100vw; border-radius: var(--r-lg) var(--r-lg) 0 0; top: auto; bottom: 0; height: 92vh; }
+  .drawer-head { padding: 16px 18px 10px; }
+  .drawer-body { padding: 14px 18px 24px; }
+  .drawer-foot { padding: 12px 18px; }
+
+  /* 统计页适配 */
+  .stat-overview { grid-template-columns: auto 1fr; gap: 14px; padding: 14px 16px; }
+  .stat-kpis { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .kpi-num { font-size: 22px; }
+  .kpi-num small { font-size: 12px; }
+  .subj-stat-row { grid-template-columns: 100px 1fr auto; gap: 8px; font-size: 12px; }
+  .subj-stat-name { font-size: 12px; }
+  .subj-stat-fig .big { font-size: 14px; }
+  .subj-stat-fig .sm { font-size: 10px; }
+
+  /* 报告模态 */
+  .rv-overview { grid-template-columns: auto 1fr; gap: 14px; padding: 14px; }
+  .rv-kpis { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .rv-kpis b { font-size: 18px; }
+  .rv-month-name { font-size: 14px; width: 36px; }
+  .rv-week-label { width: 90px; font-size: 11.5px; }
+
+  /* 浮动按钮调整 */
+  .fab-stack { right: 14px; bottom: 18px; gap: 12px; }
+  .fab { width: 48px; height: 48px; font-size: 22px; }
+  .fab-ai-label { display: none; }
+
+  /* AI面板全屏 */
+  .ai-panel { width: 100vw; max-width: 100vw; right: 0; bottom: 0; height: 100vh; max-height: 100vh; border-radius: 0; }
+  .ai-body { padding: 12px; }
+  .ai-bubble { font-size: 13px; }
+
+  /* 登录卡片 */
+  .login-card { padding: 32px 22px 28px; width: 92vw; }
+  .login-title { font-size: 20px; }
+  .login-avatar { width: 56px; height: 56px; }
+  .login-avatar::after { width: 22px; height: 22px; border-radius: 7px; }
+  .input { font-size: 16px; padding: 10px 12px; }
+
+  /* 设置抽屉 */
+  .field-label { font-size: 11px; }
+  .dur-quick button { padding: 5px 10px; font-size: 11.5px; }
+
+  /* 追踪表格 */
+  .track-grid { font-size: 11px; }
+  .track-name { font-size: 12px; }
+  .track-colhead > div { font-size: 10px; }
+
+  /* 倒计时 */
+  .side-title { font-size: 10.5px; }
+  .subj-item { padding: 6px 7px; }
+  .subj-name { font-size: 12.5px; }
+
+  /* 周视图 */
+  .tl-scroll { padding: 0 4px; }
 }
+
+/* ============ 登录浮层 ============ */
+.login-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: linear-gradient(160deg, #fbf9f6 0%, #f4f1ec 100%);
+  display: flex; align-items: center; justify-content: center;
+}
+.login-card {
+  background: var(--surface);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-lg);
+  padding: 44px 34px 34px;
+  width: 380px; max-width: calc(100vw - 40px);
+  text-align: center;
+  display: flex; flex-direction: column; gap: 18px;
+}
+.login-avatar {
+  width: 72px; height: 72px; border-radius: var(--r-lg);
+  margin: 0 auto;
+  background: conic-gradient(from 200deg, oklch(0.9 0.09 30), oklch(0.9 0.09 90), oklch(0.9 0.09 160), oklch(0.9 0.09 240), oklch(0.9 0.09 320), oklch(0.9 0.09 30));
+  display: grid; place-items: center;
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.6), var(--shadow-sm);
+}
+.login-avatar::after { content: ""; width: 28px; height: 28px; border-radius: 9px; background: var(--surface); }
+.login-title { font-family: var(--font-display); font-size: 24px; font-weight: 700; letter-spacing: 1px; }
+.login-sub { font-size: 13px; color: var(--ink-3); margin-top: -10px; }
+.login-error { font-size: 12.5px; color: oklch(0.62 0.18 25); background: oklch(0.95 0.04 25); padding: 8px 12px; border-radius: var(--r-sm); display: none; }
+.login-error.show { display: block; }
+.login-btn {
+  width: 100%; padding: 12px; border-radius: var(--r-md);
+  background: var(--ink); color: #fff; font-size: 15px; font-weight: 700;
+  transition: all 0.18s var(--ease);
+}
+.login-btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.login-btn:active { transform: scale(0.98); }
 
 </style>
 </head>
@@ -628,6 +757,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
 /* ============ 备考日历 · 数据层 (plain JS) ============ */
 (function () {
   const KEY = "beikao-cal-v2";
+  const LOGIN_KEY = "beikao-cal-login";
 
   // ---------- 颜色：浅色多巴胺，按色相均匀分布 ----------
   function subjColors(hue) {
@@ -828,6 +958,9 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { console.warn("save fail", e); }
   }
   function reset() { localStorage.removeItem(KEY); }
+  function isLoggedIn() { try { return localStorage.getItem(LOGIN_KEY) === "1"; } catch(e) { return false; } }
+  function doLogin(user, pass) { if (user === "admin" && pass === "tt123456") { localStorage.setItem(LOGIN_KEY, "1"); return true; } return false; }
+  function doLogout() { localStorage.removeItem(LOGIN_KEY); }
 
   // ---------- 统计聚合 ----------
   function eventCompletion(ev) {
@@ -1209,7 +1342,8 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
   }
 
   window.CalData = {
-    KEY, defaultState, load, save, reset, defaultSubjects, GROUP_ORDER, subjColors,
+    LOGIN_KEY, isLoggedIn, doLogin, doLogout,
+    KEY, LOGIN_KEY, defaultState, load, save, reset, isLoggedIn, doLogin, doLogout, defaultSubjects, GROUP_ORDER, subjColors,
     iso, parseISO, today, addDays, dow, startOfWeek, startOfMonth, endOfMonth, daysBetween,
     sameMonth, monthGrid, weekDays, DOW_CN, MONTH_CN, fmtMin, fmtHrs, minToTime, timeToMin, pad,
     eventCompletion, isEventDone, dayStats, rangeStats, buildICS, downloadICS, uid,
@@ -3136,6 +3270,15 @@ function SettingsDrawer({ settings, onSave, onClose, onReset, onExport, onExport
           <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
           <div className="field">
             <label className="field-label">AI 助手 · 服务商</label>
+            <div style={{ background: "var(--bg-soft)", borderRadius: "var(--r-md)", padding: "10px 13px", marginBottom: 12, display: "flex", alignItems: "center", gap: 9 }}>
+              <span style={{ width: 8, height: 8, borderRadius: 99, background: (prov === "auto" && inClaude) || d.apiKey ? "oklch(0.7 0.16 150)" : "var(--ink-3)", flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
+                {aiStatus}
+              </span>
+            </div>
+            <p style={{ fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.6, margin: "0 0 10px" }}>
+              当前运行：<b>{prov === "auto" ? (inClaude ? "Claude (自动)" : "未检测到 Claude") : preset.label}</b>{d.aiModel ? " · 模型：" + d.aiModel : " · 模型：" + preset.model}
+            </p>
             <p style={{ fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.6, margin: "0 0 10px" }}>
               在 Claude 里使用选「自动」即可，无需填 Key。<b>脱离 Claude（自己的网站 / Mac App）</b>时，选一个服务商并填入对应 API Key（仅存本机，不上传）。
             </p>
@@ -3159,9 +3302,9 @@ function SettingsDrawer({ settings, onSave, onClose, onReset, onExport, onExport
                 </p>
               </React.Fragment>
             )}
-            <div style={{ fontSize: 11.5, color: (prov === "auto" && inClaude) || d.apiKey ? "oklch(0.6 0.14 150)" : "var(--ink-3)", marginTop: 8 }}>
-              {aiStatus}
-            </div>
+            <button className="btn btn-accent" onClick={save} style={{ width: "100%", justifyContent: "center", marginTop: 12 }}>
+              <Icon name="check" size={15} stroke={2.6} /> 保存 AI 设置
+            </button>
           </div>
           <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
           <div className="field">
@@ -3235,7 +3378,42 @@ function SettingsDrawer({ settings, onSave, onClose, onReset, onExport, onExport
   );
 }
 
+/* ============ 登录界面 ============ */
+function LoginScreen({ onLogin }) {
+  const [user, setUser] = useState("");
+  const [pass, setPass] = useState("");
+  const [error, setError] = useState(false);
+
+  const handleLogin = () => {
+    if (Da.doLogin(user, pass)) {
+      onLogin();
+    } else {
+      setError(true);
+    }
+  };
+
+  return (
+    <div className="login-overlay">
+      <div className="login-card">
+        <div className="login-avatar" />
+        <div className="login-title">备考日历</div>
+        <div className="login-sub">规划每一天 · 看见每一分</div>
+        <input className="input" type="text" value={user} placeholder="账号"
+          onChange={(e) => { setUser(e.target.value); setError(false); }}
+          onKeyDown={(e) => { if (e.key === "Enter") document.getElementById("login-pass").focus(); }} />
+        <input id="login-pass" className="input" type="password" value={pass} placeholder="密码"
+          onChange={(e) => { setPass(e.target.value); setError(false); }}
+          onKeyDown={(e) => { if (e.key === "Enter") handleLogin(); }} />
+        <div className={"login-error" + (error ? " show" : "")}>账号或密码错误，请重试</div>
+        <button className="login-btn" onClick={handleLogin}>登 录</button>
+      </div>
+    </div>
+  );
+}
+
+
 function App() {
+  const [loggedIn, setLoggedIn] = useState(() => Da.isLoggedIn());
   const [state, setState] = useState(() => Da.load());
   const [view, setView] = useState("month"); // month | week | day
   const [anchor, setAnchor] = useState(Da.today());
@@ -3252,6 +3430,8 @@ function App() {
   const [syncStatus, setSyncStatus] = useState("idle"); // idle | syncing | ok | error
   const syncRef = useRef({ lastJson: null, timer: null, pulling: false });
   const stateRef = useRef(state); stateRef.current = state;
+
+  const handleLogout = () => { Da.doLogout(); setLoggedIn(false); };
   const cloudEnabled = !!(state.settings.syncEnabled && state.settings.syncToken && state.settings.syncGistId);
 
   useEffect(() => { Da.save(state); window.CalData._aiSettings = state.settings; }, [state]);
@@ -3443,6 +3623,10 @@ function App() {
     onEvent: openEvent, onAdd: newEvent, onDay: goDay, onPatch: patchEvent,
   };
 
+  if (!loggedIn) {
+    return <LoginScreen onLogin={() => setLoggedIn(true)} />;
+  }
+
   return (
     <div className="app">
       <div className="topbar">
@@ -3474,6 +3658,7 @@ function App() {
         <button className="icon-btn" title="分析报告" onClick={() => setShowReport(true)}><Icon name="book" size={19} /></button>
         <button className="btn btn-ai" onClick={() => setShowAI(true)}><Icon name="flame" size={16} /> AI 排课</button>
         <button className="icon-btn" title="设置" onClick={() => setShowSettings(true)}><Icon name="gear" size={18} /></button>
+        <button className="icon-btn" title="退出登录" onClick={handleLogout} style={{ color: "oklch(0.6 0.16 25)", opacity: 0.7 }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
       </div>
 
       <div className="main">
