@@ -3592,7 +3592,11 @@ function ReportModal({ state, setState, onClose, anchor, toast, onOpenAI }) {
       : { id: Dr.uid("g"), subjectId: null, name: "", totalHours: 10, subItems: [] }]);
   };
 
+  const [exporting, setExporting] = useState(false);
+  const [exportErr, setExportErr] = useState("");
+  const [progress, setProgress] = useState({ steps: [], current: -1, thinking: "" });
   const runAnalysis = async () => {
+    try {
     setStep("loading");
     var steps = [
       { text: "收集" + gathered.label + "学习数据", status: "done" },
@@ -3640,13 +3644,12 @@ function ReportModal({ state, setState, onClose, anchor, toast, onOpenAI }) {
     // 标记全部完成
     setProgress({ steps: steps.map(function(s) { return { text: s.text, status: "done" }; }), current: steps.length, thinking: "✓ 报告生成完成" });
     setTimeout(function() { setAnalysis(result); setAiNote(note); setStep("report"); }, 400);
+    } catch(e) { console.error("runAnalysis error:", e); setStep("goals"); setAnalysis(null); toast && toast("分析失败：" + (e.message || e)); }
   };
 
-  const [exporting, setExporting] = useState(false);
-  const [exportErr, setExportErr] = useState("");
-  const [progress, setProgress] = useState({ steps: [], current: -1, thinking: "" });
 
   const exportWord = async () => {
+    try {
     if (!analysis || exporting) return;
     setExporting(true); setExportErr("");
     var expSteps = [
@@ -3705,6 +3708,7 @@ function ReportModal({ state, setState, onClose, anchor, toast, onOpenAI }) {
     setTimeout(function() { URL.revokeObjectURL(url); }, 2000);
     setExporting(false);
     toast && toast('报告已导出为 Word 文档（.doc），可用 Microsoft Word 或 WPS 打开');
+    } catch(e) { console.error("exportWord error:", e); setExporting(false); setExportErr("导出失败：" + (e.message || e)); }
   };
 
   const usedSubjectIds = rows.map((r) => r.subjectId).filter(Boolean);
