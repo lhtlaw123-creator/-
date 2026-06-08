@@ -537,6 +537,17 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
 .ai-send:disabled { opacity: 0.35; cursor: default; }
 .ai-send:not(:disabled):hover { transform: scale(1.06); }
 
+/* 文件上传解析 */
+.ai-file-parse { background: var(--surface-2); border-radius: var(--r-md); padding: 12px 14px; margin: 6px 14px; border: 1px solid var(--line); }
+.ai-file-parse-head { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+.ai-file-label { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: var(--surface); border: 1.5px dashed var(--line); border-radius: var(--r-sm); font-size: 13px; font-weight: 600; color: var(--accent-ink); cursor: pointer; transition: all 0.15s var(--ease); }
+.ai-file-label:hover { border-color: var(--accent); background: var(--accent-soft); }
+.ai-file-busy { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-2); margin-top: 8px; }
+.ai-file-error { font-size: 13px; color: oklch(0.6 0.18 25); padding: 8px; background: oklch(0.96 0.04 25); border-radius: var(--r-sm); margin-top: 8px; }
+.ai-file-error p { margin: 0 0 6px; }
+.ai-file-goal { background: var(--surface); border-radius: var(--r-sm); padding: 8px 12px; margin-bottom: 6px; border-left: 3px solid var(--accent); }
+.ai-file-goal strong { color: var(--accent-ink); }
+
 /* ---------- 每周规划 ---------- */
 .goal-card { background: var(--surface-2); border-radius: var(--r-lg); padding: 16px 18px; }
 .wd-pick { display: flex; gap: 5px; }
@@ -588,7 +599,38 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
 .rep-si-fig { color: var(--ink-3); font-size: 11.5px; width: 54px; text-align: right; }
 .rep-si-pct { font-weight: 700; width: 38px; text-align: right; }
 .rep-si-comment { color: var(--ink-2); font-size: 12px; flex: 1; min-width: 120px; }
-.rep-foot { text-align: center; font-size: 11px; color: var(--ink-3); padding-top: 14px; border-top: 1px solid var(--line); margin-top: 6px; }
+.rep-foot { text-align: center; font-size: 11px; color: var(--ink-3); padding-top: 14px; border-top: 1px solid var(--line); margin-top: 6px; }.rep-foot { text-align: center; font-size: 11px; color: var(--ink-3); padding-top: 14px; border-top: 1px solid var(--line); margin-top: 6px; }
+
+/* 报告可视化：每日时长图 */
+.rep-daily-chart { display: flex; align-items: flex-end; gap: 3px; height: 100px; padding: 0 2px; margin-bottom: 18px; }
+.rep-daily-bar { flex: 1; min-width: 6px; border-radius: 4px 4px 0 0; position: relative; transition: height 0.6s var(--ease); cursor: default; }
+.rep-daily-bar:hover { filter: brightness(0.9); }
+.rep-daily-bar .rep-daily-label { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 9px; color: var(--ink-3); white-space: nowrap; }
+.rep-daily-bar .rep-daily-val { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 9px; font-weight: 700; color: var(--ink-2); white-space: nowrap; opacity: 0; transition: opacity 0.3s; }
+.rep-daily-bar:hover .rep-daily-val { opacity: 1; }
+
+/* 科目对比大图 */
+.rep-compare { margin-bottom: 20px; }
+.rep-compare-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.rep-compare-label { width: 80px; font-size: 12.5px; font-weight: 600; text-align: right; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rep-compare-track { flex: 1; height: 22px; background: var(--bg-soft); border-radius: 6px; overflow: hidden; position: relative; display: flex; }
+.rep-compare-done { height: 100%; border-radius: 6px 0 0 6px; transition: width 0.8s var(--ease); display: flex; align-items: center; padding-left: 8px; font-size: 10.5px; font-weight: 700; color: #fff; min-width: 0; overflow: hidden; }
+.rep-compare-goal { height: 100%; border-radius: 0 6px 6px 0; transition: width 0.8s var(--ease); opacity: 0.3; }
+.rep-compare-fig { width: 72px; font-size: 11px; font-weight: 600; color: var(--ink-2); flex-shrink: 0; text-align: left; }
+
+/* 时间分配环图 */
+.rep-time-dist { display: flex; gap: 20px; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
+.rep-time-pie { position: relative; width: 140px; height: 140px; flex-shrink: 0; }
+.rep-time-legend { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 160px; }
+.rep-time-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.rep-time-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.rep-time-name { flex: 1; }
+.rep-time-hrs { font-weight: 600; color: var(--ink-2); }
+
+/* 导出中加载状态 */
+.rep-exporting { text-align: center; padding: 40px 20px; }
+.rep-exporting .ai-typing { justify-content: center; margin-bottom: 12px; }
+.rep-exporting p { font-size: 14px; color: var(--ink-2); line-height: 1.6; }
 
 @media print {
   body.printing-report { overflow: visible; }
@@ -916,6 +958,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
         syncGistId: "",     // 云端 gist id
         syncEnabled: false,
         activeCountdown: 0,
+        aiChatHistory: [], // AI 对话记录 [{role,text}]
       },
       updatedAt: Date.now(),
       countdowns: [
@@ -1163,7 +1206,8 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
   // 预设：anthropic 用原生协议；openai/deepseek/kimi/custom 走 OpenAI 兼容 /chat/completions。
   const AI_PRESETS = {
     anthropic: { label: "Claude (Anthropic)", base: "https://api.anthropic.com/v1", model: "claude-3-5-sonnet-20241022", kind: "anthropic", keyHint: "sk-ant-..." },
-    deepseek:  { label: "DeepSeek 深度求索",   base: "https://api.deepseek.com/v1",  model: "deepseek-chat",          kind: "openai",    keyHint: "sk-..." },
+    deepseek:  { label: "DeepSeek 深度求索",   base: "https://api.deepseek.com/v1",  model: "deepseek-chat",          kind: "openai",    keyHint: "sk-...",
+                 chatModel: "deepseek-v4-flash", analysisModel: "deepseek-v4-pro" },
     openai:    { label: "OpenAI",              base: "https://api.openai.com/v1",    model: "gpt-4o-mini",            kind: "openai",    keyHint: "sk-..." },
     kimi:      { label: "Kimi 月之暗面",        base: "https://api.moonshot.cn/v1",   model: "moonshot-v1-8k",         kind: "openai",    keyHint: "sk-..." },
     custom:    { label: "自定义 (OpenAI 兼容)",  base: "",                              model: "gpt-4o-mini",            kind: "openai",    keyHint: "API Key" },
@@ -1171,7 +1215,8 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
 
   // 优先用 Claude 环境注入的 window.claude；否则按 settings 选择供应商直连。
   // settings 可为对象 {apiKey, aiProvider, aiBaseUrl, aiModel}；为兼容旧调用，也接受纯字符串(=apiKey)。
-  async function aiComplete(prompt, settings) {
+  // mode: "chat"(默认,快) | "analysis"(深,Pro) — DeepSeek 时自动切换模型
+  async function aiComplete(prompt, settings, mode) {
     if (typeof settings === "string") settings = { apiKey: settings };
     settings = settings || (window.CalData && window.CalData._aiSettings) || {};
     const provider = settings.aiProvider || "auto";
@@ -1185,7 +1230,12 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     const prov = provider === "auto" ? "anthropic" : provider; // auto 但无 Claude → 按 Anthropic
     const preset = AI_PRESETS[prov] || AI_PRESETS.anthropic;
     const base = ((settings.aiBaseUrl || preset.base) || "").replace(/\/+$/, "");
-    const model = (settings.aiModel || "").trim() || preset.model;
+    // DeepSeek 双模型：chat → flash, analysis → pro
+    let model = (settings.aiModel || "").trim();
+    if (!model && prov === "deepseek") {
+      model = (mode === "analysis") ? (preset.analysisModel || "deepseek-v4-pro") : (preset.chatModel || "deepseek-v4-flash");
+    }
+    if (!model) model = preset.model;
 
     if (!key || !base) { const e = new Error("NO_AI"); e.code = "NO_AI"; throw e; }
 
@@ -1253,17 +1303,26 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
   function cloudPayload(state) {
     const s = JSON.parse(JSON.stringify(state));
     if (s.settings) {
-      delete s.settings.syncToken; delete s.settings.syncGistId; delete s.settings.syncEnabled;
-      delete s.settings.apiKey; delete s.settings.aiBaseUrl;
+      // 仅剔除本机专属的同步凭据，AI 设置和其余配置一并同步
+      delete s.settings.syncToken;
+      delete s.settings.syncGistId;
+      delete s.settings.syncEnabled;
     }
     return s;
   }
   // 采用云端数据时，保留本机秘密设置
   function mergeCloud(local, cloud) {
     const m = JSON.parse(JSON.stringify(cloud));
+    // 同步凭据每设备独立；AI 设置云端优先（除非本地已有配置）
     m.settings = Object.assign({}, cloud.settings, {
-      syncToken: local.settings.syncToken, syncGistId: local.settings.syncGistId, syncEnabled: local.settings.syncEnabled,
-      apiKey: local.settings.apiKey, aiBaseUrl: local.settings.aiBaseUrl,
+      syncToken: local.settings.syncToken,
+      syncGistId: local.settings.syncGistId,
+      syncEnabled: local.settings.syncEnabled,
+      // 如果云端有 AI 配置且本地为空，用云端的；否则保留本地
+      apiKey: local.settings.apiKey || cloud.settings.apiKey || "",
+      aiProvider: local.settings.aiProvider || cloud.settings.aiProvider || "auto",
+      aiBaseUrl: local.settings.aiBaseUrl || cloud.settings.aiBaseUrl || "",
+      aiModel: local.settings.aiModel || cloud.settings.aiModel || "",
     });
     return m;
   }
@@ -2464,6 +2523,40 @@ function parseJSONLoose(txt) {
   try { return JSON.parse(t); } catch (e) { return null; }
 }
 
+function buildFileParsePrompt(state, fileContent, fileName) {
+  const today = Dai.today();
+  return [
+    "你是一个备考学习规划助手。用户上传了一个文件，请根据文件内容提取2-3个学习目标。",
+    "今天是 " + today + "。",
+    "文件名：" + fileName,
+    "文件内容：",
+    fileContent.slice(0, 8000), // 限制长度
+    "",
+    "要求：",
+    "1. 提炼出2-3个明确的学习目标（如：掌握某个知识点、完成某章练习等）",
+    "2. 每个目标包含：科目名(subject)、目标标题(title)、预计时长(durationMin,整数分钟)、3-5个待办(todos)",
+    "3. 科目名尽量匹配用户已有的科目列表，如果是新科目就给一个合理的名称",
+    "4. 如果文件内容不足以提取目标，返回空数组",
+    "只输出 JSON：",
+    '{"goals":[{"subject":"科目名","title":"目标标题","durationMin":120,"todos":["待办1","待办2"]}]}',
+    "用户已有科目：" + state.subjects.map((s) => s.name).join("、"),
+  ].join("\n");
+}
+
+function buildChatPrompt(state, userText) {
+  const today = Dai.today();
+  const evs = Dai.compactEvents(state, Dai.addDays(today, -7), Dai.addDays(today, 60));
+  const subjList = Dai.GROUP_ORDER.map((g) => g + "：" + state.subjects.filter((s) => s.group === g).map((s) => s.name).join("、")).join("\n");
+  return [
+    "你是备考全能助手，精通法考/考研/升学备考，擅长学习策略、法律知识解答、心态调整和时间管理。",
+    "今天是 " + today + "。",
+    "当前学习科目：" + subjList,
+    "近期日程（供参考）：" + (evs.length ? evs.join("\n") : "暂无"),
+    "请用中文直接回答用户问题，友好、专业、有建设性，不需要 JSON 格式。",
+    "用户问题：" + userText,
+  ].join("\n");
+}
+
 function buildSchedulePrompt(state, userText) {
   const today = Dai.today();
   const wd = "周" + Dai.DOW_CN[Dai.dow(today)];
@@ -2527,13 +2620,47 @@ const QUICK = [
   "把今天没做完的任务挪到明天",
 ];
 
-function AssistantPanel({ state, setState, onClose, toast }) {
+function AssistantPanel({ state, setState, onClose, toast, initialMsg }) {
   const [show, setShow] = useState(false);
-  const [msgs, setMsgs] = useState([{ role: "ai", text: "我是你的备考全能助手 ✦ 可以帮你排课、回答法律问题、规划学习策略。试试：「刑法中的因果关系怎么理解？」或「把刑法这周每天晚上排90分钟」。" }]);
+  const makeInitMsgs = () => {
+    if (initialMsg && initialMsg.headline) {
+      return [
+        { role: "ai", text: "以下是「' + initialMsg.headline + '」的分析报告。你可以问我任何关于这份报告的问题，比如：\n· 哪些科目需要重点关注？\n· 如何提高某个薄弱子项？\n· 帮我制定下阶段学习计划" },
+      ];
+    }
+    // 如果有历史记录，恢复；否则显示欢迎语
+    if (state.aiChatHistory && state.aiChatHistory.length > 0) {
+      return state.aiChatHistory.map((m) => ({ role: m.role, text: m.text }));
+    }
+    return [{ role: "ai", text: "我是你的备考全能助手 ✦ 可以帮你排课、回答法律问题、规划学习策略。试试：「刑法中的因果关系怎么理解？」或「把刑法这周每天晚上排90分钟」。" }];
+  };
+  const [msgs, setMsgs] = useState(makeInitMsgs);
+
+  // 每次 msgs 变化时（跳过初始加载），持久化对话记录
+  const saveChatHistory = (ms) => {
+    // 只保存 role + text，过滤掉临时字段
+    const clean = ms.filter((m) => m.role && m.text && !m.needKey).map((m) => ({ role: m.role, text: m.text }));
+    // 限制最近100条
+    const trimmed = clean.slice(-100);
+    setState((s) => {
+      if (JSON.stringify(s.aiChatHistory) === JSON.stringify(trimmed)) return s;
+      return { ...s, aiChatHistory: trimmed };
+    });
+  };
+
+  // 在消息变更时保存（跳过初始mount 和 报告上下文）
+  const msgCountRef = useRef(initialMsg ? -1 : msgs.length);
+  useEffect(() => {
+    if (msgCountRef.current > 0) saveChatHistory(msgs);
+    msgCountRef.current = msgs.length;
+  }, [msgs]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const bodyRef = useRef(null);
   const { listening, toggle, supported } = useVoice(setInput);
+  const [showFileParse, setShowFileParse] = useState(false);
+  const [fileBusy, setFileBusy] = useState(false);
+  const [fileResult, setFileResult] = useState(null); // {goals:[], fileName} or {error:""}
 
   useEffect(() => { const t = setTimeout(() => setShow(true), 10); return () => clearTimeout(t); }, []);
   useEffect(() => { if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight; }, [msgs, busy]);
@@ -2550,18 +2677,25 @@ function AssistantPanel({ state, setState, onClose, toast }) {
       setBusy(false); return;
     }
     try {
-      const prompt = buildSchedulePrompt(state, q);
-      const raw = await Dai.aiComplete(prompt, state.settings);
-      const data = parseJSONLoose(raw);
-      if (!data || !Array.isArray(data.actions)) {
-        setMsgs((m) => [...m, { role: "ai", text: "我没太理解，换种说法再试一次？（比如指明科目、日期、时长）" }]);
-        setBusy(false); return;
+      // 智能判断：排课指令 vs 通用问答
+      const scheduleKw = /排|安排|添加|加一节|挪到|删除|取消|改|调整|计划|日程|课|节|学习块|几点|小时|分钟|每天|每周/g;
+      const isSchedule = scheduleKw.test(q);
+      const prompt = isSchedule ? buildSchedulePrompt(state, q) : buildChatPrompt(state, q);
+      const raw = await Dai.aiComplete(prompt, state.settings, "chat");
+      if (isSchedule) {
+        const data = parseJSONLoose(raw);
+        if (!data || !Array.isArray(data.actions)) {
+          setMsgs((m) => [...m, { role: "ai", text: raw && raw.trim() ? raw.trim() : "我没太理解，换种说法再试一次？（比如指明科目、日期、时长）" }]);
+          setBusy(false); return;
+        }
+        const snapshot = state.events;
+        const { events, summary } = Dai.applyActions(state, data.actions);
+        setState((s) => ({ ...s, events }));
+        setMsgs((m) => [...m, { role: "ai", text: data.reply || "已更新日程", summary, undo: snapshot }]);
+        toast && toast(`已更新 ${summary.length} 项日程`);
+      } else {
+        setMsgs((m) => [...m, { role: "ai", text: raw && raw.trim() ? raw.trim() : "请再说一遍？" }]);
       }
-      const snapshot = state.events;
-      const { events, summary } = Dai.applyActions(state, data.actions);
-      setState((s) => ({ ...s, events }));
-      setMsgs((m) => [...m, { role: "ai", text: data.reply || "已更新日程", summary, undo: snapshot }]);
-      toast && toast(`已更新 ${summary.length} 项日程`);
     } catch (e) {
       setMsgs((m) => [...m, { role: "ai", text: "出错了：" + (e.message || e) + "，稍后再试。" }]);
     }
@@ -2584,6 +2718,8 @@ function AssistantPanel({ state, setState, onClose, toast }) {
             <div style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700 }}>AI 助手</div>
             <div style={{ fontSize: 11, color: "var(--ink-3)" }}>说一句话，我帮你改日历</div>
           </div>
+          <button className="icon-btn" title="上传文件解析" onClick={() => { setShowFileParse(!showFileParse); setFileResult(null); }}><Icon name="download" size={16} /></button>
+          {!initialMsg && state.aiChatHistory && state.aiChatHistory.length > 0 && <button className="icon-btn" title="清空对话" onClick={() => { if (confirm("清空所有对话记录？")) { setState((s) => ({ ...s, aiChatHistory: [] })); setMsgs(makeInitMsgs); } }} style={{ color: "oklch(0.6 0.16 25)" }}><Icon name="trash" size={15} /></button>}
           <button className="icon-btn" onClick={close}><Icon name="close" /></button>
         </div>
         <div className="ai-body" ref={bodyRef}>
@@ -2609,11 +2745,106 @@ function AssistantPanel({ state, setState, onClose, toast }) {
           ))}
           {busy && <div className="ai-msg ai"><div className="ai-bubble ai ai-typing"><i /><i /><i /></div></div>}
         </div>
-        {msgs.length <= 1 && (
+        {msgs.length <= 1 && !initialMsg && (
           <div className="ai-quick">
             {QUICK.map((q) => <button key={q} onClick={() => send(q)}>{q}</button>)}
           </div>
         )}
+        {/* 文件上传解析 */}
+        {showFileParse && (
+          <div className="ai-file-parse">
+            <div className="ai-file-parse-head">
+              <Icon name="book" size={15} /> 上传文件，AI 提取学习目标
+              <button className="icon-btn" onClick={() => { setShowFileParse(false); setFileResult(null); }} style={{ marginLeft: "auto" }}><Icon name="close" size={14} /></button>
+            </div>
+            {!fileResult ? (
+              <React.Fragment>
+                <label className="ai-file-label">
+                  <input type="file" accept=".txt,.md,.csv,.json,.docx,.pdf" style={{ display: "none" }}
+                    onChange={async (e) => {
+                      const f = e.target.files && e.target.files[0];
+                      if (!f) return;
+                      setFileBusy(true);
+                      try {
+                        const text = await new Promise((resolve, reject) => {
+                          const reader = new FileReader();
+                          reader.onload = () => resolve(reader.result);
+                          reader.onerror = reject;
+                          if (f.name.endsWith(".pdf") || f.name.endsWith(".docx")) {
+                            // 二进制文件：只取文件名，让 AI 根据文件名推测
+                            resolve("（二进制文件，无法直接读取文本内容）\n文件名：" + f.name);
+                          } else {
+                            reader.readAsText(f, "UTF-8");
+                          }
+                        });
+                        if (!Dai.aiAvailable(state)) {
+                          setFileResult({ error: "请先在设置里配置 AI（API Key）" });
+                          setFileBusy(false);
+                          return;
+                        }
+                        const prompt = buildFileParsePrompt(state, text, f.name);
+                        const raw = await Dai.aiComplete(prompt, state.settings, "chat");
+                        const data = parseJSONLoose(raw);
+                        if (data && data.goals && data.goals.length) {
+                          setFileResult({ goals: data.goals, fileName: f.name });
+                        } else {
+                          setFileResult({ error: "未能从文件中提取到学习目标，请检查文件内容。" });
+                        }
+                      } catch (err) {
+                        setFileResult({ error: "解析失败：" + (err.message || err) });
+                      }
+                      setFileBusy(false);
+                      e.target.value = "";
+                    }} />
+                  <Icon name="download" size={14} /> 选择文件（.txt .md .csv）
+                </label>
+                {fileBusy && <div className="ai-file-busy"><div className="ai-typing"><i /><i /><i /></div> AI 正在分析文件…</div>}
+              </React.Fragment>
+            ) : fileResult.error ? (
+              <div className="ai-file-error">
+                <p>{fileResult.error}</p>
+                <button className="btn btn-soft" onClick={() => setFileResult(null)}>重试</button>
+              </div>
+            ) : (
+              <div className="ai-file-goals">
+                <p style={{ fontSize: 12.5, color: "var(--ink-2)", margin: "0 0 6px" }}>
+                  从「{fileResult.fileName}」中提取到 {fileResult.goals.length} 个学习目标，确认后加入日程：
+                </p>
+                {fileResult.goals.map((g, i) => (
+                  <div className="ai-file-goal" key={i}>
+                    <div><strong>{g.subject}</strong> · {g.title}</div>
+                    <div style={{ fontSize: 11.5, color: "var(--ink-2)" }}>
+                      {Dai.fmtMin(g.durationMin || 120)} · 待办：{(g.todos || []).join("、")}
+                    </div>
+                  </div>
+                ))}
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  <button className="btn btn-accent" style={{ flex: 1 }} onClick={() => {
+                    const today = Dai.today();
+                    const newEvents = fileResult.goals.map((g, i) => ({
+                      id: Dai.uid("ev"),
+                      date: Dai.addDays(today, i),
+                      subject: g.subject,
+                      title: g.title,
+                      start: null,
+                      durationMin: g.durationMin || 120,
+                      todos: (g.todos || []).map((t) => ({ text: t, done: false })),
+                    }));
+                    setState((s) => ({ ...s, events: [...s.events, ...newEvents] }));
+                    setMsgs((m) => [...m,
+                      { role: "user", text: "上传并解析了文件「" + fileResult.fileName + "」" },
+                      { role: "ai", text: "已提取 " + fileResult.goals.length + " 个学习目标并加入日程（从今天起依次排布）" },
+                    ]);
+                    toast && toast("已添加 " + fileResult.goals.length + " 个学习目标");
+                    setShowFileParse(false); setFileResult(null);
+                  }}>确认并加入日程</button>
+                  <button className="btn btn-ghost" onClick={() => setFileResult(null)}>放弃</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="ai-input">
           {supported && (
             <button className={"ai-mic" + (listening ? " on" : "")} onClick={toggle} title="语音输入">
@@ -2923,6 +3154,32 @@ function localAnalyze(rows, map, days, label) {
   };
 }
 
+function buildDeepReportPrompt(rows, map, days, label, from, to) {
+  const lines = rows.map((r) => {
+    const real = realFor(map, r);
+    const target = r.totalHours || subItemTarget(r);
+    const subs = (r.subItems || []).map((si) => `  - 子项「${si.name}」目标${si.hours}h，已完成${si.done || 0}h`).join("\n");
+    return `科目「${r.name}」总目标${target}h，实际学习${Dr.fmtHrs(real.doneMin)}h，待办完成${real.todoDone}/${real.todoTotal}` + (subs ? "\n" + subs : "（未拆子项）");
+  });
+  const dayLine = days.map((d) => `${d.date.slice(5)}:${Math.round(d.done / 60 * 10) / 10}h`).join(" ");
+  return [
+    "你是资深教育评估专家与学习教练。请基于以下学习数据，撰写一份正式、详尽、有深度的学习分析报告，用于归档和导出为Word文档。",
+    "报告要求：",
+    "1. 语言正式但不枯燥，结构清晰，段落分明。",
+    "2. 每个科目写200-400字的深度分析，包含：学习进度评估、时间利用效率、知识掌握程度推断、薄弱环节识别、改进路径。",
+    "3. 每个子项写80-150字的专项分析。",
+    "4. 整体概览写300-500字，涵盖学习节奏、投入产出比、持续性评价。",
+    "5. 亮点和风险各至少列3条，每条30-60字，要具体。",
+    "6. 下阶段建议至少5条，每条50-80字，标明优先级（高/中/低）。",
+    "7. 新增「总体评价」字段（150-250字），以教练口吻给出阶段性总结和鼓励。",
+    "只输出 JSON：",
+    '{"headline":"精炼有力的标题","score":0到100,"overall":"300-500字整体分析","summary":"150-250字总结鼓励","subjects":[{"name":"科目名","comment":"200-400字深度分析","subItems":[{"name":"子项名","comment":"80-150字分析"}]}],"wins":["亮点1","亮点2","亮点3"],"risks":["风险1","风险2","风险3"],"trend":"趋势判断","suggestions":["建议1 优先级:高","建议2..."]}',
+    "时间范围：" + from + " 至 " + to,
+    "数据：", lines.join("\n"),
+    "每日完成时长：" + dayLine,
+  ].join("\n");
+}
+
 function buildReportPrompt(rows, map, days, label, from, to) {
   const lines = rows.map((r) => {
     const real = realFor(map, r);
@@ -2932,14 +3189,20 @@ function buildReportPrompt(rows, map, days, label, from, to) {
   });
   const dayLine = days.map((d) => `${d.date.slice(5)}:${Math.round(d.done / 60 * 10) / 10}h`).join(" ");
   return [
-    "你是备考全能教练。基于下面的" + label + "学习数据做简洁、具体、鼓励但诚实的中文分析，如果用户提出额外问题也直接回答。",
-    "重点：要对每个科目的【各个子项】分别点评，而不是只给科目一个笼统结论。",
+    "你是资深备考教练与学习策略专家。基于下面的" + label + "学习数据做一份深度、全面、有洞察力的中文分析报告。",
+    "分析维度（必须全部覆盖）：",
+    "1. 整体学习状态评估（学习节奏、专注度、持续性）。",
+    "2. 各科目深度分析：不仅要看时长，更要看学习质量——子项完成质量、时间分配合理性、薄弱环节识别。",
+    "3. 学习策略诊断：哪些方法有效、哪些需要调整、知识体系是否有断层。",
+    "4. 趋势判断：与前阶段相比是否有进步或退步迹象。",
+    "5. 个性化建议：针对当前阶段给出具体可执行的改进方案。",
+    "每个科目的每个子项都要逐一点评，点评需具体指出进度、质量、问题和建议。",
     "只输出 JSON，不要 markdown：",
-    '{"headline":"一句话总评","score":0到100整数,"overall":"2-3句整体分析","subjects":[{"name":"科目名","comment":"结合目标与实际的1句点评","subItems":[{"name":"子项名","comment":"针对该子项进度的简短点评"}]}],"wins":["亮点"],"risks":["风险/落后点"],"suggestions":["下阶段具体建议"]}',
+    '{"headline":"一句精炼且有洞察力的总评","score":0到100整数,"overall":"3-5句深度整体分析，涵盖学习状态、趋势、关键问题","subjects":[{"name":"科目名","comment":"2-3句深度点评，含时长分析、完成质量、薄弱点","subItems":[{"name":"子项名","comment":"针对子项进度的深度点评，指出问题和建议"}]}],"wins":["至少2个亮点，具体到科目或子项"],"risks":["至少2个风险点，给出严重程度判断"],"trend":"与前期的对比趋势判断","suggestions":["至少3条具体可执行的下阶段建议，标明优先级"]}',
     "时间范围：" + from + " 至 " + to,
     "数据：", lines.join("\n"),
     "每日完成时长：" + dayLine,
-    "subjects 覆盖下列所有科目与子项。每条点评不超过 28 字。",
+    "要求：每条点评 20-60 字，要有实质内容，不能泛泛而谈。score 严格反映完成度，不要给面子分。",
   ].join("\n");
 }
 
@@ -3026,7 +3289,107 @@ function GoalRow({ row, subjects, usedSubjectIds, realDone, onChange, onRemove }
   );
 }
 
-function ReportModal({ state, setState, onClose, anchor, toast }) {
+
+// ---------- PDF 导出（排版HTML → 浏览器打印） ----------
+// 格式：全文宋体四号(14pt)，除一级标题(h4)外全部首行缩进，行距1.5
+function generatePrintHTML(analysis, rows, state, gathered, totDone, totTarget, activeDays) {
+  const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  let bodyHtml = '';
+
+  // 封面标题
+  bodyHtml += '<div class="cover"><h1>备考日历 · ' + esc(gathered.label) + '学习分析报告</h1>';
+  bodyHtml += '<p class="subtitle">' + esc(analysis.headline) + '</p>';
+  bodyHtml += '<p class="date">' + esc(gathered.from) + ' 至 ' + esc(gathered.to) + '</p>';
+  bodyHtml += '<div class="kpi-row"><div class="kpi"><b>' + totDone.toFixed(1) + 'h</b><span>已完成</span></div>';
+  bodyHtml += '<div class="kpi"><b>' + totTarget.toFixed(0) + 'h</b><span>目标合计</span></div>';
+  bodyHtml += '<div class="kpi"><b>' + (totTarget ? Math.round(Math.min(1, totDone / totTarget) * 100) : 0) + '%</b><span>达成率</span></div>';
+  bodyHtml += '<div class="kpi"><b>' + activeDays + '/' + gathered.days.length + '</b><span>学习天数</span></div></div>';
+  bodyHtml += '<div class="score">表现评分：' + (analysis.score || 0) + '分</div></div>';
+
+  // 整体概览
+  bodyHtml += '<h4>一、整体概览</h4>';
+  (analysis.overall || '').split('\n').filter(Boolean).forEach((line) => {
+    bodyHtml += '<p>' + esc(line.trim()) + '</p>';
+  });
+
+  // 总结（深度分析）
+  if (analysis.summary) {
+    bodyHtml += '<h4>二、总体评价</h4>';
+    (analysis.summary || '').split('\n').filter(Boolean).forEach((line) => {
+      bodyHtml += '<p>' + esc(line.trim()) + '</p>';
+    });
+  }
+
+  // 各科目深度分析
+  const sectionIdx = analysis.summary ? '三' : '二';
+  bodyHtml += '<h4>' + sectionIdx + '、各科目深度分析</h4>';
+  rows.forEach((r, ri) => {
+    const target = r.totalHours || (r.subItems || []).reduce((a, x) => a + (+x.hours || 0), 0);
+    const done = (r.subItems && r.subItems.length) ? (r.subItems || []).reduce((a, x) => a + (+x.done || 0), 0) : 0;
+    const ratio = target ? Math.min(1, done / target) : 0;
+    const ai = (analysis.subjects || []).find((x) => x.name === r.name || (x.name && r.name.includes(x.name)));
+    bodyHtml += '<h5>' + (ri + 1) + '. ' + esc(r.name || '未命名') + '（已完成 ' + done.toFixed(1) + 'h / 目标 ' + (target || '—') + 'h，' + Math.round(ratio * 100) + '%）</h5>';
+    if (ai && ai.comment) bodyHtml += '<p>' + esc(ai.comment) + '</p>';
+    (r.subItems || []).forEach((si) => {
+      const sai = ai && ai.subItems && ai.subItems.find((x) => x.name === si.name || (x.name && si.name.includes(x.name)));
+      bodyHtml += '<p class="subitem"><strong>' + esc(si.name) + '</strong>：' + (si.done || 0) + '/' + si.hours + 'h';
+      if (sai && sai.comment) bodyHtml += ' — ' + esc(sai.comment);
+      bodyHtml += '</p>';
+    });
+  });
+
+  // 亮点
+  const nextIdx1 = analysis.summary ? '四' : '三';
+  bodyHtml += '<h4>' + nextIdx1 + '、亮点</h4>';
+  (analysis.wins || []).forEach((w) => { bodyHtml += '<p>' + esc(w) + '</p>'; });
+
+  // 风险
+  const nextIdx2 = analysis.summary ? '五' : '四';
+  bodyHtml += '<h4>' + nextIdx2 + '、风险与落后点</h4>';
+  (analysis.risks || []).forEach((w) => { bodyHtml += '<p>' + esc(w) + '</p>'; });
+
+  // 趋势
+  if (analysis.trend) {
+    const nextIdx3 = analysis.summary ? '六' : '五';
+    bodyHtml += '<h4>' + nextIdx3 + '、趋势判断</h4>';
+    bodyHtml += '<p>' + esc(analysis.trend) + '</p>';
+  }
+
+  // 建议
+  const suggestIdx = analysis.summary ? (analysis.trend ? '七' : '六') : (analysis.trend ? '六' : '五');
+  bodyHtml += '<h4>' + suggestIdx + '、下阶段建议</h4>';
+  (analysis.suggestions || []).forEach((w, i) => {
+    bodyHtml += '<p>' + (i + 1) + '. ' + esc(w) + '</p>';
+  });
+
+  // 页脚
+  bodyHtml += '<div class="footer">—— 由备考日历生成 · ' + Dr.today() + '</div>';
+
+  // 完整 HTML 文档
+  return '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>备考日历 · ' + esc(gathered.label) + '学习分析报告</title><style>'
+    + '@page { margin: 20mm 25mm; size: A4; }'
+    + '* { box-sizing: border-box; }'
+    + 'body { font-family: "Songti SC", "SimSun", "STSong", "宋体", serif; font-size: 14pt; line-height: 1.5; color: #222; max-width: 100%; }'
+    + 'h1 { font-size: 22pt; font-weight: 700; text-align: center; margin: 0 0 8px; letter-spacing: 2px; }'
+    + '.cover { text-align: center; margin-bottom: 36px; padding-bottom: 28px; border-bottom: 2px solid #333; }'
+    + '.subtitle { font-size: 15pt; color: #555; margin: 6px 0; }'
+    + '.date { font-size: 12pt; color: #888; margin: 4px 0 20px; }'
+    + '.kpi-row { display: flex; justify-content: center; gap: 32px; margin: 18px 0; }'
+    + '.kpi { text-align: center; }'
+    + '.kpi b { display: block; font-size: 18pt; font-weight: 700; }'
+    + '.kpi span { font-size: 10pt; color: #666; }'
+    + '.score { font-size: 13pt; margin-top: 10px; color: #444; }'
+    + 'h4 { font-size: 16pt; font-weight: 700; margin: 28px 0 12px; padding-bottom: 4px; border-bottom: 1px solid #ddd; }'
+    + 'h5 { font-size: 14pt; font-weight: 700; margin: 16px 0 8px; }'
+    + 'p { text-indent: 2em; margin: 0 0 8px; text-align: justify; }'
+    + 'p.subitem { text-indent: 2em; font-size: 13pt; margin-left: 1em; }'
+    + '.footer { text-align: right; font-size: 10pt; color: #999; margin-top: 40px; padding-top: 12px; border-top: 1px solid #ddd; }'
+    + '@media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }'
+    + '</style></head><body>' + bodyHtml + '</body></html>';
+}
+
+function ReportModal({ state, setState, onClose, anchor, toast, onOpenAI }) {
   const [show, setShow] = useState(false);
   const [mode, setMode] = useState("month");
   const [step, setStep] = useState("goals");
@@ -3069,7 +3432,7 @@ function ReportModal({ state, setState, onClose, anchor, toast }) {
     let result = null, note = "";
     if (Dr.aiAvailable(state)) {
       try {
-        const raw = await Dr.aiComplete(buildReportPrompt(rows, gathered.map, gathered.days, gathered.label, gathered.from, gathered.to), state.settings);
+        const raw = await Dr.aiComplete(buildReportPrompt(rows, gathered.map, gathered.days, gathered.label, gathered.from, gathered.to), state.settings, "analysis");
         result = window.parseJSONLoose(raw);
         if (!result || !result.subjects) { result = null; note = "AI 返回异常，已用本地分析。"; }
       } catch (e) { note = "AI 暂不可用（" + String(e.message || e).slice(0, 40) + "），已用本地分析。"; }
@@ -3080,10 +3443,41 @@ function ReportModal({ state, setState, onClose, anchor, toast }) {
     setAnalysis(result); setAiNote(note); setStep("report");
   };
 
-  const printReport = () => {
-    document.body.classList.add("printing-report");
-    window.print();
-    setTimeout(() => document.body.classList.remove("printing-report"), 500);
+  const [exporting, setExporting] = useState(false);
+  const [exportErr, setExportErr] = useState("");
+
+  const exportPDF = async () => {
+    if (!analysis || exporting) return;
+    setExporting(true); setExportErr("");
+    let deepAnalysis = null;
+    // 触发 AI 深度分析
+    if (Dr.aiAvailable(state)) {
+      try {
+        const deepRaw = await Dr.aiComplete(buildDeepReportPrompt(rows, gathered.map, gathered.days, gathered.label, gathered.from, gathered.to), state.settings, "analysis");
+        deepAnalysis = window.parseJSONLoose(deepRaw);
+        if (!deepAnalysis || !deepAnalysis.subjects) deepAnalysis = null;
+      } catch (e) {
+        setExportErr("AI 深度分析失败，使用基础报告导出。");
+      }
+    }
+    if (!deepAnalysis) deepAnalysis = analysis; // 降级使用屏幕分析
+    const printHTML = generatePrintHTML(deepAnalysis, rows, state, gathered, totDone, totTarget, activeDays);
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (w) {
+      w.document.write(printHTML);
+      w.document.close();
+      w.focus();
+      // 等待渲染完成后触发打印
+      setTimeout(() => {
+        w.print();
+        setExporting(false);
+        toast && toast(deepAnalysis !== analysis ? "深度分析报告已打开打印（请选择存为 PDF）" : "报告已打开打印（请选择存为 PDF）");
+      }, 600);
+    } else {
+      // 弹窗被拦截时降级
+      setExporting(false);
+      toast && toast("请允许弹窗以导出 PDF");
+    }
   };
 
   const usedSubjectIds = rows.map((r) => r.subjectId).filter(Boolean);
@@ -3103,7 +3497,8 @@ function ReportModal({ state, setState, onClose, anchor, toast }) {
             <button className={mode === "month" ? "on" : ""} onClick={() => setMode("month")}>月报</button>
           </div>
           <div className="spacer" />
-          {step === "report" && <button className="btn btn-soft" onClick={printReport}><Icon name="download" size={15} /> 存为 PDF</button>}
+          {step === "report" && <button className="btn btn-ghost" onClick={() => onOpenAI && onOpenAI(analysis)}><Icon name="flame" size={15} /> 与AI对话</button>}
+          {step === "report" && <button className="btn btn-soft" onClick={exportPDF}><Icon name="download" size={15} /> 导出 PDF</button>}
           {step === "report" && <button className="btn btn-ghost" onClick={() => setStep("goals")}><Icon name="target" size={15} /> 改目标</button>}
           <button className="icon-btn" onClick={close}><Icon name="close" /></button>
         </div>
@@ -3133,7 +3528,15 @@ function ReportModal({ state, setState, onClose, anchor, toast }) {
             </div>
           )}
 
-          {step === "report" && analysis && (
+          {exporting && (
+            <div className="rep-exporting">
+              <div className="ai-typing" style={{ justifyContent: "center", marginBottom: 16 }}><i /><i /><i /></div>
+              <p>AI 正在生成深度分析报告…</p>
+              <p style={{ fontSize: 12, color: "var(--ink-3)" }}>这需要几秒钟时间，AI 会逐科撰写详尽评语</p>
+            </div>
+          )}
+
+          {step === "report" && analysis && !exporting && (
             <div className="report-sheet">
               <div className="rep-header">
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -3154,6 +3557,58 @@ function ReportModal({ state, setState, onClose, anchor, toast }) {
                 <div><b className="font-display tnum">{totTarget.toFixed(0)}h</b><span>目标合计</span></div>
                 <div><b className="font-display tnum">{totTarget ? Math.round(Math.min(1, totDone / totTarget) * 100) : 0}%</b><span>目标达成率</span></div>
                 <div><b className="font-display tnum">{activeDays}/{gathered.days.length}</b><span>有效学习天</span></div>
+              </div>
+
+              {/* 可视化：每日学习时长图 */}
+              <div className="rep-section">
+                <h4>每日学习时长</h4>
+                <div className="rep-daily-chart">
+                  {gathered.days.map((d) => {
+                    const hrs = d.done / 60;
+                    const maxH = Math.max(1, ...gathered.days.map((x) => x.done / 60));
+                    const h = Math.max(1, Math.round((hrs / maxH) * 80));
+                    const color = hrs > 4 ? "var(--accent)" : hrs > 1 ? "oklch(0.72 0.13 190)" : "var(--line)";
+                    return (
+                      <div key={d.date} className="rep-daily-bar" style={{ height: h + "px", background: color }}
+                        title={d.date.slice(5) + ": " + hrs.toFixed(1) + "h"}>
+                        <div className="rep-daily-val">{hrs.toFixed(1)}h</div>
+                        <div className="rep-daily-label">{d.date.slice(8)}日</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize: 10.5, color: "var(--ink-3)", textAlign: "center", marginTop: 24 }}>
+                  每日实际学习时长（深色=时长长，浅色=时长短）
+                </div>
+              </div>
+
+              {/* 可视化：科目时间分配 */}
+              <div className="rep-section">
+                <h4>科目时间分配对比</h4>
+                <div className="rep-compare">
+                  {rows.map((r) => {
+                    const subj = r.subjectId ? state.subjects.find((s) => s.id === r.subjectId) : null;
+                    const color = subj ? subj.solid : "var(--ink-3)";
+                    const target = r.totalHours || subItemTarget(r) || 0;
+                    const done = (r.subItems && r.subItems.length) ? subItemDone(r) : realFor(gathered.map, r).doneMin / 60;
+                    const ratio = target ? Math.min(1, done / target) : 0;
+                    const maxW = Math.max(target, ...rows.map((x) => x.totalHours || subItemTarget(x) || 1));
+                    const doneW = Math.max(2, (done / maxW) * 100);
+                    const goalW = Math.max(2, ((target - done) / maxW) * 100);
+                    return (
+                      <div className="rep-compare-row" key={r.id}>
+                        <div className="rep-compare-label" style={{ color }}>{r.name || "—"}</div>
+                        <div className="rep-compare-track">
+                          <div className="rep-compare-done" style={{ width: doneW + "%", background: color }}>
+                            {done >= target * 0.1 ? done.toFixed(0) + "h" : ""}
+                          </div>
+                          {goalW > 0 && <div className="rep-compare-goal" style={{ width: goalW + "%", background: color }} />}
+                        </div>
+                        <div className="rep-compare-fig">{done.toFixed(1)}/{target.toFixed(0)}h</div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="rep-section"><h4>整体概览</h4><p>{analysis.overall}</p></div>
@@ -3295,7 +3750,7 @@ function SettingsDrawer({ settings, onSave, onClose, onReset, onExport, onExport
               </span>
             </div>
             <p style={{ fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.6, margin: "0 0 10px" }}>
-              当前运行：<b>{prov === "auto" ? (inClaude ? "Claude (自动)" : "未检测到 Claude") : preset.label}</b>{d.aiModel ? " · 模型：" + d.aiModel : " · 模型：" + preset.model}
+              当前运行：<b>{prov === "auto" ? (inClaude ? "Claude (自动)" : "未检测到 Claude") : preset.label}</b>{d.aiModel ? " · 模型：" + d.aiModel : (prov === "deepseek" ? " · 对话/分析：" + (preset.chatModel || "flash") + " / " + (preset.analysisModel || "pro") : " · 模型：" + preset.model)}
             </p>
             <p style={{ fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.6, margin: "0 0 10px" }}>
               在 Claude 里使用选「自动」即可，无需填 Key。<b>脱离 Claude（自己的网站 / Mac App）</b>时，选一个服务商并填入对应 API Key（仅存本机，不上传）。
@@ -3732,8 +4187,8 @@ function App() {
       )}
       {showStats && <StatsModal events={state.events} subjects={state.subjects} settings={state.settings} anchor={anchor} onClose={() => setShowStats(false)} />}
       {showPlanner && <WeeklyPlanner state={state} setState={setState} toast={toast} initialWeek={Da.weekKey(anchor)} onClose={() => setShowPlanner(false)} />}
-      {showReport && <ReportModal state={state} setState={setState} anchor={anchor} toast={toast} onClose={() => setShowReport(false)} />}
-      {showAI && <AssistantPanel state={state} setState={setState} toast={toast} onClose={() => setShowAI(false)} />}
+      {showReport && <ReportModal state={state} setState={setState} anchor={anchor} toast={toast} onClose={() => setShowReport(false)} onOpenAI={(analysis) => { setShowReport(false); setShowAI(true); window._reportContext = analysis; }} />}
+      {showAI && <AssistantPanel state={state} setState={setState} toast={toast} onClose={() => { setShowAI(false); window._reportContext = null; }} initialMsg={window._reportContext} />}
       {showCountdownMgr && <CountdownManager countdowns={state.countdowns}
         onChange={(countdowns) => setState((s) => ({ ...s, countdowns }))}
         onClose={() => setShowCountdownMgr(false)} />}
