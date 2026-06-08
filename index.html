@@ -811,6 +811,13 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
   const ADMIN_API_KEY = "";
   const SYNC_TOKEN = "";
 
+  // 按用户隔离数据（不同账号独立数据）
+  function userKey() {
+    var u = getLoggedInUser();
+    var name = (u && u.username) || "guest";
+    return KEY + "-" + name;
+  }
+
   // ---------- 颜色：浅色多巴胺，按色相均匀分布 ----------
   function subjColors(hue) {
     return {
@@ -982,7 +989,17 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
 
   function load() {
     try {
-      const raw = localStorage.getItem(KEY);
+      var uk = userKey();
+      var raw = localStorage.getItem(uk);
+      // 兼容迁移：旧数据在共享 key 下，迁移到用户 key
+      if (!raw) {
+        var old = localStorage.getItem(KEY);
+        if (old) {
+          localStorage.setItem(uk, old);
+          localStorage.removeItem(KEY);
+          raw = old;
+        }
+      }
       if (!raw) return defaultState();
       const s = JSON.parse(raw);
       if (!s || !s.subjects || !s.events) return defaultState();
@@ -1009,9 +1026,9 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     }
   }
   function save(state) {
-    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { console.warn("save fail", e); }
+    try { localStorage.setItem(userKey(), JSON.stringify(state)); } catch (e) { console.warn("save fail", e); }
   }
-  function reset() { localStorage.removeItem(KEY); }
+  function reset() { localStorage.removeItem(userKey()); }
   // ---------- 多用户系统 ----------
   function getUsers() {
     try {
@@ -1064,12 +1081,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
   function isLoggedIn() {
     try {
       var v = localStorage.getItem(LOGIN_KEY);
-      if (!v) return false;
-      if (v === "1") {
-        // 迁移旧 login 标记
-        localStorage.setItem(LOGIN_KEY, JSON.stringify({ username: "admin", role: "admin" }));
-        return true;
-      }
+      if (!v || v === "1") return false;
       var u = JSON.parse(v);
       return !!(u && u.username);
     } catch(e) { return false; }
@@ -1099,7 +1111,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
   function getLoggedInUser() {
     try {
       var v = localStorage.getItem(LOGIN_KEY);
-      if (!v || v === "1") return { username: "admin", role: "admin" };
+      if (!v || v === "1") return null;
       return JSON.parse(v);
     } catch(e) { return null; }
   }
@@ -3790,6 +3802,7 @@ function useToast() {
 }
 
 function SettingsDrawer({ settings, onSave, onClose, onReset, onExport, onExportBackup, onImportBackup, cloudEnabled, syncStatus, onConnectCloud, onDisconnectCloud, onSyncNow }) {
+  const isAdminUser = Da.isAdmin();
   const [show, setShow] = useState(false);
   const [d, setD] = useState(settings);
   const [tokenInput, setTokenInput] = useState("");
@@ -3892,6 +3905,7 @@ function SettingsDrawer({ settings, onSave, onClose, onReset, onExport, onExport
                 <p style={{ fontSize: 11.5, color: "var(--ink-3)", lineHeight: 1.6, margin: "8px 0 0" }}>
                   Key 获取：DeepSeek platform.deepseek.com · OpenAI platform.openai.com · Kimi platform.moonshot.cn · Claude console.anthropic.com。个别服务商可能限制浏览器直连（CORS），DeepSeek 通常可用。
                 </p>
+              </React.Fragment>
             )}
             <button className="btn btn-accent" onClick={save} style={{ width: "100%", justifyContent: "center", marginTop: 12 }}>
               <Icon name="check" size={15} stroke={2.6} /> 保存 AI 设置
@@ -4006,6 +4020,70 @@ function SettingsDrawer({ settings, onSave, onClose, onReset, onExport, onExport
   );
 }
 
+
+/* ============ 云同步配置提示 ============ */
+function SyncPrompt({ state, setState, connectCloud, toast, onClose }) {
+  const [token, setToken] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const handleSave = async () => {
+    var t = (token || "").trim();
+    if (!t) { toast("请输入 GitHub Token"); return; }
+    setBusy(true);
+    try {
+      // 先保存 token
+      setState(function(s) {
+        var next = { ...s, settings: { ...s.settings, syncToken: t } };
+        Da.save(next);
+        return next;
+      });
+      // 尝试连接
+      await connectCloud(t);
+      toast("云同步已开启");
+      onClose();
+    } catch(e) {
+      toast("连接失败：" + (e.message || e));
+    }
+    setBusy(false);
+  };
+
+  const handleSkip = () => {
+    toast("可随时在右上角「设置」中配置云同步");
+    onClose();
+  };
+
+  return (
+    <React.Fragment>
+      <div className="scrim show" onClick={handleSkip} />
+      <div className="modal show" style={{ width: 420 }}>
+        <div className="modal-head">
+          <Icon name="download" size={20} style={{ marginTop: 2 }} />
+          <div className="font-display" style={{ fontSize: 20, fontWeight: 700, flex: 1 }}>配置云同步</div>
+          <button className="icon-btn" onClick={handleSkip}><Icon name="close" /></button>
+        </div>
+        <div className="modal-body">
+          <p style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.7, margin: "0 0 16px" }}>
+            绑定 GitHub Token 后，你的日程数据会自动在多台设备间同步。<br/>Token 仅存本机，不会被上传到云端。
+          </p>
+          <input className="input" type="password" value={token} placeholder="粘贴 GitHub Token（ghp_...）" autoComplete="off"
+            onChange={(e) => setToken(e.target.value.trim())}
+            onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
+            style={{ marginBottom: 8 }} />
+          <p style={{ fontSize: 11.5, color: "var(--ink-3)", lineHeight: 1.7, margin: "0 0 16px" }}>
+            获取方式：GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate，勾选 <b>gist</b> 权限。
+          </p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn btn-ghost" onClick={handleSkip} style={{ flex: 1, justifyContent: "center" }}>跳过</button>
+            <button className="btn btn-accent" onClick={handleSave} disabled={busy} style={{ flex: 1, justifyContent: "center" }}>
+              {busy ? "连接中…" : "绑定并开启同步"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </React.Fragment>
+  );
+}
+
 /* ============ 登录界面 ============ */
 function LoginScreen({ onLogin }) {
   const [user, setUser] = useState("");
@@ -4102,18 +4180,28 @@ function App() {
   const [collapsed, setCollapsed] = useState(false);
   const [toast, toastNode] = useToast();
   const [syncStatus, setSyncStatus] = useState("idle"); // idle | syncing | ok | error
+  const [showSyncPrompt, setShowSyncPrompt] = useState(false);
   const syncRef = useRef({ lastJson: null, timer: null, pulling: false });
   const stateRef = useRef(state); stateRef.current = state;
 
   const handleLogout = () => { Da.doLogout(); setLoggedIn(false); };
 
-  // 登录后：若已开启云同步则拉取数据；管理员可手动在设置中配置 API Key 和云同步 Token
+  // 登录后：重新加载用户数据、检查云同步配置
   const autoSyncRef = useRef(false);
   useEffect(() => {
     if (!loggedIn || autoSyncRef.current) return;
     autoSyncRef.current = true;
-    const isAdminUser = Da.isAdmin();
-    const st = stateRef.current;
+
+    // 重新加载当前用户的数据（替换登录前的 guest 数据）
+    var s = Da.load();
+    if (s.settings && s.settings.passwordHash) {
+      Da.setPasswordHash(s.settings.passwordHash);
+    }
+    setState(s);
+    stateRef.current = s;
+
+    var isAdminUser = Da.isAdmin();
+    var st = s;
 
     // 如果已经开启了云同步，拉取一下云端最新数据
     if (st.settings.syncEnabled && st.settings.syncToken && st.settings.syncGistId) {
@@ -4123,6 +4211,11 @@ function App() {
     // Admin 已配置 syncToken 但未连接，自动连接
     if (isAdminUser && st.settings.syncToken && !st.settings.syncGistId) {
       connectCloud(st.settings.syncToken);
+      return;
+    }
+    // 未配置云同步：弹出提示让用户输入
+    if (!st.settings.syncToken) {
+      setTimeout(function() { setShowSyncPrompt(true); }, 600);
     }
   }, [loggedIn]);
   const cloudEnabled = !!(state.settings.syncEnabled && state.settings.syncToken && state.settings.syncGistId);
@@ -4412,6 +4505,9 @@ function App() {
           onDisconnectCloud={disconnectCloud}
           onSyncNow={syncNow}
           onClose={() => setShowSettings(false)} />
+      )}
+      {showSyncPrompt && (
+        <SyncPrompt state={state} setState={setState} connectCloud={connectCloud} toast={toast} onClose={() => setShowSyncPrompt(false)} />
       )}
       {toastNode}
     </div>
