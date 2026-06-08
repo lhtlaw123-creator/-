@@ -1079,12 +1079,8 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     });
   }
   function isLoggedIn() {
-    try {
-      var v = localStorage.getItem(LOGIN_KEY);
-      if (!v || v === "1") return false;
-      var u = JSON.parse(v);
-      return !!(u && u.username);
-    } catch(e) { return false; }
+    // 默认未登录，每次打开页面都需要重新登录
+    return false;
   }
   async function doLogin(user, pass) {
     if (!user || !pass) return false;
