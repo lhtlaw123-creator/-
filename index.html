@@ -217,6 +217,11 @@ input, textarea { font-family: inherit; }
   border-left: 3px solid;
 }
 .tl-event:hover { transform: scale(1.01); box-shadow: var(--shadow-md); z-index: 5; }
+.tl-event { cursor: grab; touch-action: none; }
+.tl-event.dragging { cursor: grabbing; transform: none; box-shadow: var(--shadow-lg); opacity: 0.96; transition: none; }
+.te-resize { position: absolute; left: 0; right: 0; bottom: 0; height: 9px; cursor: ns-resize; border-bottom-left-radius: 9px; border-bottom-right-radius: 9px; }
+.te-resize::after { content: ""; position: absolute; left: 50%; bottom: 2.5px; transform: translateX(-50%); width: 18px; height: 2px; border-radius: 2px; background: currentColor; opacity: 0; transition: opacity .15s var(--ease); }
+.tl-event:hover .te-resize::after { opacity: 0.4; }
 .tl-event.done { opacity: 0.6; }
 .tl-event .te-title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tl-event .te-meta { font-size: 10.5px; opacity: 0.8; margin-top: 1px; font-variant-numeric: tabular-nums; }
@@ -348,12 +353,30 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
 .empty { text-align: center; color: var(--ink-3); padding: 40px 20px; font-size: 14px; }
 
 /* 浮动添加按钮 */
+.fab-stack {
+  position: fixed; right: 26px; bottom: 26px; z-index: 40;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 14px;
+}
 .fab {
-  position: fixed; right: 26px; bottom: 26px; width: 56px; height: 56px; border-radius: 50%;
+  width: 56px; height: 56px; border-radius: 50%;
   background: var(--ink); color: #fff; display: grid; place-items: center; box-shadow: var(--shadow-lg);
-  z-index: 40; transition: all 0.22s var(--ease-spring); font-size: 26px;
+  transition: all 0.22s var(--ease-spring); font-size: 26px; cursor: pointer; border: none;
 }
 .fab:hover { transform: scale(1.08) rotate(90deg); }
+.fab-ai-wrap { position: relative; display: flex; align-items: center; }
+.fab-ai {
+  background: #CC785C;
+  background: linear-gradient(150deg, #D98E6A, #C56A4D);
+}
+.fab-ai:hover { transform: scale(1.08); box-shadow: 0 8px 26px -6px rgba(197,106,77,0.6); }
+.fab-ai-label {
+  position: absolute; right: 66px; white-space: nowrap;
+  background: var(--ink); color: #fff; padding: 9px 15px; border-radius: 999px;
+  font-size: 14px; font-weight: 600; box-shadow: var(--shadow-md);
+  opacity: 0; transform: translateX(10px); pointer-events: none;
+  transition: opacity .2s var(--ease), transform .2s var(--ease);
+}
+.fab-ai-wrap:hover .fab-ai-label { opacity: 1; transform: translateX(0); }
 
 /* 进入动画 */
 @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
@@ -570,7 +593,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
 @media print {
   body.printing-report { overflow: visible; }
   body.printing-report .app, body.printing-report .scrim, body.printing-report .no-print,
-  body.printing-report .fab, body.printing-report .ai-panel { display: none !important; }
+  body.printing-report .fab, body.printing-report .fab-stack, body.printing-report .ai-panel { display: none !important; }
   body.printing-report .modal { position: static; transform: none !important; box-shadow: none; width: auto; max-height: none; opacity: 1; }
   body.printing-report .modal-body { overflow: visible; padding: 0; }
   body.printing-report .report-sheet { padding: 0; }
@@ -753,8 +776,15 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
         hiddenSubjects: [],
         motto: "千里之行，始于足下。今天也要踏实地走一步。",
         apiKey: "",
+        aiProvider: "auto", // auto | anthropic | openai | deepseek | kimi | custom
+        aiBaseUrl: "",      // 仅自定义时使用
+        aiModel: "",        // 留空则用该供应商默认模型
+        syncToken: "",      // GitHub token（仅本机，不上传云端）
+        syncGistId: "",     // 云端 gist id
+        syncEnabled: false,
         activeCountdown: 0,
       },
+      updatedAt: Date.now(),
       countdowns: [
         { id: "c1", name: "法考客观题", date: addDays(today(), 90), emoji: "⚖️" },
         { id: "c2", name: "期末考试", date: addDays(today(), 45), emoji: "📚" },
@@ -978,34 +1008,153 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     });
   }
 
-  // ---------- 可移植 AI 调用 ----------
-  // 优先用 Claude 环境注入的 window.claude；否则用用户自己的 API key 直连 Anthropic。
-  async function aiComplete(prompt, apiKey) {
-    if (typeof window !== "undefined" && window.claude && window.claude.complete) {
+  // ---------- 可移植 AI 调用（支持多家供应商） ----------
+  // 预设：anthropic 用原生协议；openai/deepseek/kimi/custom 走 OpenAI 兼容 /chat/completions。
+  const AI_PRESETS = {
+    anthropic: { label: "Claude (Anthropic)", base: "https://api.anthropic.com/v1", model: "claude-3-5-sonnet-20241022", kind: "anthropic", keyHint: "sk-ant-..." },
+    deepseek:  { label: "DeepSeek 深度求索",   base: "https://api.deepseek.com/v1",  model: "deepseek-chat",          kind: "openai",    keyHint: "sk-..." },
+    openai:    { label: "OpenAI",              base: "https://api.openai.com/v1",    model: "gpt-4o-mini",            kind: "openai",    keyHint: "sk-..." },
+    kimi:      { label: "Kimi 月之暗面",        base: "https://api.moonshot.cn/v1",   model: "moonshot-v1-8k",         kind: "openai",    keyHint: "sk-..." },
+    custom:    { label: "自定义 (OpenAI 兼容)",  base: "",                              model: "gpt-4o-mini",            kind: "openai",    keyHint: "API Key" },
+  };
+
+  // 优先用 Claude 环境注入的 window.claude；否则按 settings 选择供应商直连。
+  // settings 可为对象 {apiKey, aiProvider, aiBaseUrl, aiModel}；为兼容旧调用，也接受纯字符串(=apiKey)。
+  async function aiComplete(prompt, settings) {
+    if (typeof settings === "string") settings = { apiKey: settings };
+    settings = settings || (window.CalData && window.CalData._aiSettings) || {};
+    const provider = settings.aiProvider || "auto";
+
+    // 自动模式：在 Claude 环境里直接用注入能力
+    if (provider === "auto" && typeof window !== "undefined" && window.claude && window.claude.complete) {
       return await window.claude.complete(prompt);
     }
-    const key = apiKey || (window.CalData && window.CalData._apiKey) || "";
-    if (!key) { const e = new Error("NO_AI"); e.code = "NO_AI"; throw e; }
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+
+    const key = (settings.apiKey || "").trim();
+    const prov = provider === "auto" ? "anthropic" : provider; // auto 但无 Claude → 按 Anthropic
+    const preset = AI_PRESETS[prov] || AI_PRESETS.anthropic;
+    const base = ((settings.aiBaseUrl || preset.base) || "").replace(/\/+$/, "");
+    const model = (settings.aiModel || "").trim() || preset.model;
+
+    if (!key || !base) { const e = new Error("NO_AI"); e.code = "NO_AI"; throw e; }
+
+    if (preset.kind === "anthropic") {
+      const resp = await fetch(base + "/messages", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": key,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({ model, max_tokens: 2000, messages: [{ role: "user", content: prompt }] }),
+      });
+      if (!resp.ok) { const t = await resp.text(); const e = new Error("API " + resp.status + ": " + t.slice(0, 200)); e.code = "API_ERR"; throw e; }
+      const data = await resp.json();
+      return (data.content && data.content[0] && data.content[0].text) || "";
+    }
+
+    // OpenAI 兼容协议
+    const resp = await fetch(base + "/chat/completions", {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": key,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true",
-      },
-      body: JSON.stringify({
-        model: "claude-3-5-sonnet-20241022",
-        max_tokens: 2000,
-        messages: [{ role: "user", content: prompt }],
-      }),
+      headers: { "content-type": "application/json", "authorization": "Bearer " + key },
+      body: JSON.stringify({ model, max_tokens: 2000, messages: [{ role: "user", content: prompt }] }),
     });
     if (!resp.ok) { const t = await resp.text(); const e = new Error("API " + resp.status + ": " + t.slice(0, 200)); e.code = "API_ERR"; throw e; }
     const data = await resp.json();
-    return (data.content && data.content[0] && data.content[0].text) || "";
+    return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
   }
   function aiAvailable(state) {
     return !!(typeof window !== "undefined" && ((window.claude && window.claude.complete) || (state && state.settings && state.settings.apiKey)));
+  }
+
+  // ---------- 备份 / 恢复（跨设备搬运数据） ----------
+  function exportBackup(state) {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const d = new Date();
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `备考日历备份-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+  function parseBackup(text) {
+    const s = JSON.parse(text);
+    if (!s || !s.subjects || !s.events) throw new Error("文件格式不对，请选择由本应用导出的备份文件");
+    const def = defaultState();
+    s.settings = Object.assign({}, def.settings, s.settings || {});
+    s.weeklyPlans = s.weeklyPlans || {};
+    s.monthlyGoals = s.monthlyGoals || {};
+    s.weeklyGoals = s.weeklyGoals || {};
+    s.memos = s.memos || [];
+    s.countdowns = s.countdowns || def.countdowns;
+    return s;
+  }
+
+  // ---------- 云同步（GitHub Gist） ----------
+  // 用用户自己的 GitHub Token 把数据存在一个私密 gist 里，多设备自动同步。
+  const GIST_FILE = "beikao-cal.json";
+  function gistHeaders(token) {
+    return { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json", "Content-Type": "application/json" };
+  }
+  // 同步到云端的数据：剔除本机秘密（token / API key）
+  function cloudPayload(state) {
+    const s = JSON.parse(JSON.stringify(state));
+    if (s.settings) {
+      delete s.settings.syncToken; delete s.settings.syncGistId; delete s.settings.syncEnabled;
+      delete s.settings.apiKey; delete s.settings.aiBaseUrl;
+    }
+    return s;
+  }
+  // 采用云端数据时，保留本机秘密设置
+  function mergeCloud(local, cloud) {
+    const m = JSON.parse(JSON.stringify(cloud));
+    m.settings = Object.assign({}, cloud.settings, {
+      syncToken: local.settings.syncToken, syncGistId: local.settings.syncGistId, syncEnabled: local.settings.syncEnabled,
+      apiKey: local.settings.apiKey, aiBaseUrl: local.settings.aiBaseUrl,
+    });
+    return m;
+  }
+  async function cloudFindGist(token) {
+    const resp = await fetch("https://api.github.com/gists?per_page=100", { headers: gistHeaders(token) });
+    if (!resp.ok) throw new Error(githubErr(resp.status));
+    const list = await resp.json();
+    const g = (list || []).find((x) => x.files && x.files[GIST_FILE]);
+    return g ? g.id : null;
+  }
+  async function cloudCreateGist(token, state) {
+    const resp = await fetch("https://api.github.com/gists", {
+      method: "POST", headers: gistHeaders(token),
+      body: JSON.stringify({ description: "备考日历数据（自动云同步，请勿删除）", public: false, files: { [GIST_FILE]: { content: JSON.stringify(state) } } }),
+    });
+    if (!resp.ok) throw new Error(githubErr(resp.status));
+    const g = await resp.json();
+    return g.id;
+  }
+  async function cloudRead(token, gistId) {
+    const resp = await fetch("https://api.github.com/gists/" + gistId, { headers: gistHeaders(token) });
+    if (!resp.ok) throw new Error(githubErr(resp.status));
+    const g = await resp.json();
+    const f = g.files && g.files[GIST_FILE];
+    if (!f) return null;
+    let content = f.content;
+    if (f.truncated && f.raw_url) content = await (await fetch(f.raw_url)).text();
+    try { return JSON.parse(content); } catch (e) { return null; }
+  }
+  async function cloudWrite(token, gistId, state) {
+    const resp = await fetch("https://api.github.com/gists/" + gistId, {
+      method: "PATCH", headers: gistHeaders(token),
+      body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(state) } } }),
+    });
+    if (!resp.ok) throw new Error(githubErr(resp.status));
+    return true;
+  }
+  function githubErr(code) {
+    if (code === 401) return "Token 无效或已过期（401）";
+    if (code === 403) return "权限不足或频率超限（403），请确认 Token 勾选了 gist 权限";
+    if (code === 404) return "找不到云端数据（404）";
+    return "GitHub 错误 " + code;
   }
 
   // ---------- 每月所含的周（周一起点） ----------
@@ -1065,7 +1214,9 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     sameMonth, monthGrid, weekDays, DOW_CN, MONTH_CN, fmtMin, fmtHrs, minToTime, timeToMin, pad,
     eventCompletion, isEventDone, dayStats, rangeStats, buildICS, downloadICS, uid,
     weekKey, monthKey, resolveSubject, applyActions, compactEvents, planProgress,
-    aiComplete, aiAvailable, weeksInMonth, subjectReview,
+    aiComplete, aiAvailable, AI_PRESETS, exportBackup, parseBackup,
+    cloudPayload, mergeCloud, cloudFindGist, cloudCreateGist, cloudRead, cloudWrite,
+    weeksInMonth, subjectReview,
   };
 })();
 
@@ -1100,6 +1251,23 @@ function Icon({ name, size = 18, stroke = 1.9 }) {
     book: <g><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></g>,
   };
   return <svg {...p}>{paths[name] || null}</svg>;
+}
+
+/* ---------- AI 星芒标记（Claude 入口） ---------- */
+function ClaudeLogo({ size = 26 }) {
+  const rays = 11, cx = 12, cy = 12, inner = 1.6, outer = 9.6;
+  const lines = [];
+  for (let i = 0; i < rays; i++) {
+    const a = (i / rays) * Math.PI * 2 - Math.PI / 2;
+    lines.push(<line key={i}
+      x1={(cx + Math.cos(a) * inner).toFixed(2)} y1={(cy + Math.sin(a) * inner).toFixed(2)}
+      x2={(cx + Math.cos(a) * outer).toFixed(2)} y2={(cy + Math.sin(a) * outer).toFixed(2)} />);
+  }
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round">
+      {lines}
+    </svg>
+  );
 }
 
 /* ---------- 进度环 ---------- */
@@ -1186,10 +1354,10 @@ function EventDrawer({ event, subjects, onSave, onDelete, onClose }) {
 
   const close = () => { setShow(false); setTimeout(onClose, 300); };
   const patch = (p) => setDraft((d) => ({ ...d, ...p }));
-  const commit = (next) => { const v = next || draft; onSave(v); };
+  const commit = (explicit) => { onSave(draft, explicit); };
 
-  // 自动保存（失焦/关闭时）
-  const handleClose = () => { commit(); close(); };
+  // 自动保存（失焦/关闭时，非显式）
+  const handleClose = () => { commit(false); close(); };
 
   const groups = D.GROUP_ORDER.map((g) => [g, subjects.filter((s) => s.group === g)]);
 
@@ -1262,7 +1430,7 @@ function EventDrawer({ event, subjects, onSave, onDelete, onClose }) {
           )}
           <div className="spacer" />
           <button className="btn btn-soft" onClick={handleClose}>取消</button>
-          <button className="btn btn-accent" onClick={() => { commit(); close(); }}>
+          <button className="btn btn-accent" onClick={() => { commit(true); close(); }}>
             <Icon name="check" size={15} stroke={2.6} /> 保存
           </button>
         </div>
@@ -1271,7 +1439,7 @@ function EventDrawer({ event, subjects, onSave, onDelete, onClose }) {
   );
 }
 
-Object.assign(window, { Icon, Ring, MiniRing, TodoEditor, EventDrawer, DUR_PRESETS });
+Object.assign(window, { Icon, ClaudeLogo, Ring, MiniRing, TodoEditor, EventDrawer, DUR_PRESETS });
 
 </script>
   <script type="text/babel">
@@ -1376,28 +1544,76 @@ function NowLine({ date }) {
   return <div className="tl-now" style={{ top }} />;
 }
 
-function TimelineEvent({ it, subjects, onEvent, single }) {
+function TimelineEvent({ it, subjects, onEvent, onPatch, days, dayIndex }) {
   const { e } = it;
   const s = subjOf(subjects, e.subjectId);
   const done = Dv.isEventDone(e);
-  const top = ((it.s - START_HOUR * 60) / 60) * HOUR_H;
-  const h = Math.max(22, ((e.durationMin || 30) / 60) * HOUR_H - 3);
+  const baseTop = ((it.s - START_HOUR * 60) / 60) * HOUR_H;
+  const baseH = Math.max(22, ((e.durationMin || 30) / 60) * HOUR_H - 3);
   const w = 100 / it.ncol;
   const comp = Dv.eventCompletion(e);
+  const elRef = useRef(null);
+  const [drag, setDrag] = useState(null); // {mode, top, h, leftShift, label}
+
+  const MPP = 60 / HOUR_H;          // 每像素多少分钟
+  const snap = (m) => Math.round(m / 30) * 30; // 吸附到 30 分钟
+
+  const startDrag = (mode) => (ev) => {
+    if (ev.button != null && ev.button !== 0) return;
+    ev.stopPropagation();
+    ev.preventDefault();
+    const col = elRef.current && elRef.current.closest(".tl-col");
+    const colW = col ? col.getBoundingClientRect().width : 1;
+    const x0 = ev.clientX, y0 = ev.clientY;
+    const origStart = it.s, origDur = e.durationMin || 30;
+    let moved = false, last = null;
+    const onMove = (mv) => {
+      const dx = mv.clientX - x0, dy = mv.clientY - y0;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
+      if (mode === "move") {
+        let ns = snap(origStart + dy * MPP);
+        ns = Math.max(START_HOUR * 60, Math.min(ns, END_HOUR * 60 - origDur));
+        let di = dayIndex;
+        if (days.length > 1) di = Math.max(0, Math.min(days.length - 1, dayIndex + Math.round(dx / colW)));
+        last = { date: days[di], start: Dv.minToTime(ns) };
+        setDrag({ mode, top: ((ns - START_HOUR * 60) / 60) * HOUR_H, h: baseH, leftShift: (di - dayIndex) * 100, label: Dv.minToTime(ns) + (days.length > 1 ? " · 周" + Dv.DOW_CN[Dv.dow(days[di])] : "") });
+      } else {
+        let nd = snap(origDur + dy * MPP);
+        nd = Math.max(30, Math.min(nd, END_HOUR * 60 - origStart));
+        last = { durationMin: nd };
+        setDrag({ mode, top: baseTop, h: Math.max(22, (nd / 60) * HOUR_H - 3), leftShift: 0, label: Dv.fmtMin(nd) });
+      }
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      setDrag(null);
+      if (!moved) { onEvent(e); return; }
+      if (last && onPatch) onPatch(e.id, last);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+
+  const top = drag ? drag.top : baseTop;
+  const h = drag ? drag.h : baseH;
+  const leftPct = it.col * w + (drag ? drag.leftShift : 0);
   return (
-    <div className={"tl-event" + (done ? " done" : "")}
+    <div ref={elRef} className={"tl-event" + (done ? " done" : "") + (drag ? " dragging" : "")}
       style={{
-        top, height: h, left: `calc(${it.col * w}% + 3px)`, width: `calc(${w}% - 6px)`,
+        top, height: h, left: `calc(${leftPct}% + 3px)`, width: `calc(${w}% - 6px)`,
         background: s.fill, color: s.ink, borderLeftColor: s.solid,
+        zIndex: drag ? 50 : undefined,
       }}
-      onClick={() => onEvent(e)}>
+      onPointerDown={startDrag("move")}>
       <div className="te-title">{done ? "✓ " : ""}{e.title}</div>
-      {h > 34 && <div className="te-meta tnum">{e.start} · {Dv.fmtMin(e.durationMin)}{comp.total ? ` · ${comp.done}/${comp.total}` : ""}</div>}
+      {h > 34 && <div className="te-meta tnum">{drag ? drag.label : (e.start + " · " + Dv.fmtMin(e.durationMin) + (comp.total ? ` · ${comp.done}/${comp.total}` : ""))}</div>}
+      <div className="te-resize" onPointerDown={startDrag("resize")} title="拖动调整时长" />
     </div>
   );
 }
 
-function Timeline({ days, events, subjects, settings, onEvent, onAdd, onDayHeader }) {
+function Timeline({ days, events, subjects, settings, onEvent, onAdd, onDayHeader, onPatch }) {
   const scrollRef = useRef(null);
   const t = Dv.today();
   const hours = [];
@@ -1454,7 +1670,7 @@ function Timeline({ days, events, subjects, settings, onEvent, onAdd, onDayHeade
                   <div className="tl-hour-line" key={h}
                     onClick={() => onAdd(d, Dv.minToTime(h * 60))} style={{ cursor: "copy" }} />
                 ))}
-                {timed.map((it) => <TimelineEvent key={it.e.id} it={it} subjects={subjects} onEvent={onEvent} />)}
+                {timed.map((it) => <TimelineEvent key={it.e.id} it={it} subjects={subjects} onEvent={onEvent} onPatch={onPatch} days={days} dayIndex={days.indexOf(d)} />)}
                 <NowLine date={d} />
                 {untimed.length > 0 && (
                   <div style={{ position: "absolute", top: 2, left: 3, right: 3, display: "flex", flexDirection: "column", gap: 2 }}>
@@ -1480,7 +1696,7 @@ function WeekView(props) {
 }
 
 /* ---------- 日视图：时间轴 + 当日清单焦点 ---------- */
-function DayView({ anchor, events, subjects, settings, onEvent, onAdd }) {
+function DayView({ anchor, events, subjects, settings, onEvent, onAdd, onPatch }) {
   const list = useMemo(() => events.filter((e) => e.date === anchor)
     .sort((a, b) => (a.start || "99").localeCompare(b.start || "99")), [events, anchor]);
   const ds = Dv.dayStats(events, anchor, settings.dailyGoalMin);
@@ -1490,7 +1706,7 @@ function DayView({ anchor, events, subjects, settings, onEvent, onAdd }) {
   return (
     <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <Timeline days={[anchor]} events={events} subjects={subjects} settings={settings} onEvent={onEvent} onAdd={onAdd} />
+        <Timeline days={[anchor]} events={events} subjects={subjects} settings={settings} onEvent={onEvent} onAdd={onAdd} onPatch={onPatch} />
       </div>
       <div style={{ width: 300, flexShrink: 0, borderLeft: "1px solid var(--line)", padding: "20px 18px", overflowY: "auto", background: "var(--surface-2)" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingBottom: 18, borderBottom: "1px solid var(--line)" }}>
@@ -2178,12 +2394,12 @@ function AssistantPanel({ state, setState, onClose, toast }) {
     setMsgs((m) => [...m, { role: "user", text: q }]);
     setBusy(true);
     if (!Dai.aiAvailable(state)) {
-      setMsgs((m) => [...m, { role: "ai", text: "⚠️ 还没接入 AI。请点右上角「设置」填入你的 Anthropic API Key，即可在任意浏览器里使用 AI 排课。", needKey: true }]);
+      setMsgs((m) => [...m, { role: "ai", text: "⚠️ 还没接入 AI。请点右上角「设置」选择 AI 服务商（如 DeepSeek / OpenAI / Claude）并填入 API Key，即可在任意浏览器里使用 AI 排课。", needKey: true }]);
       setBusy(false); return;
     }
     try {
       const prompt = buildSchedulePrompt(state, q);
-      const raw = await Dai.aiComplete(prompt, state.settings.apiKey);
+      const raw = await Dai.aiComplete(prompt, state.settings);
       const data = parseJSONLoose(raw);
       if (!data || !Array.isArray(data.actions)) {
         setMsgs((m) => [...m, { role: "ai", text: "我没太理解，换种说法再试一次？（比如指明科目、日期、时长）" }]);
@@ -2701,7 +2917,7 @@ function ReportModal({ state, setState, onClose, anchor, toast }) {
     let result = null, note = "";
     if (Dr.aiAvailable(state)) {
       try {
-        const raw = await Dr.aiComplete(buildReportPrompt(rows, gathered.map, gathered.days, gathered.label, gathered.from, gathered.to), state.settings.apiKey);
+        const raw = await Dr.aiComplete(buildReportPrompt(rows, gathered.map, gathered.days, gathered.label, gathered.from, gathered.to), state.settings);
         result = window.parseJSONLoose(raw);
         if (!result || !result.subjects) { result = null; note = "AI 返回异常，已用本地分析。"; }
       } catch (e) { note = "AI 暂不可用（" + String(e.message || e).slice(0, 40) + "），已用本地分析。"; }
@@ -2877,13 +3093,24 @@ function useToast() {
   return [show, node];
 }
 
-function SettingsDrawer({ settings, onSave, onClose, onReset, onExport }) {
+function SettingsDrawer({ settings, onSave, onClose, onReset, onExport, onExportBackup, onImportBackup, cloudEnabled, syncStatus, onConnectCloud, onDisconnectCloud, onSyncNow }) {
   const [show, setShow] = useState(false);
   const [d, setD] = useState(settings);
+  const [tokenInput, setTokenInput] = useState("");
+  const fileRef = useRef(null);
   useEffect(() => { const t = setTimeout(() => setShow(true), 10); return () => clearTimeout(t); }, []);
   const close = () => { setShow(false); setTimeout(onClose, 300); };
   const patch = (p) => setD((x) => ({ ...x, ...p }));
   const save = () => { onSave(d); close(); };
+
+  const AI_PROVIDERS = [["auto", "自动"], ["deepseek", "DeepSeek"], ["openai", "OpenAI"], ["kimi", "Kimi"], ["anthropic", "Claude"], ["custom", "自定义"]];
+  const inClaude = !!(typeof window !== "undefined" && window.claude && window.claude.complete);
+  const prov = d.aiProvider || "auto";
+  const preset = Da.AI_PRESETS[prov === "auto" ? "anthropic" : prov] || Da.AI_PRESETS.anthropic;
+  const needKey = !(prov === "auto" && inClaude);
+  const aiStatus = (prov === "auto" && inClaude)
+    ? "✓ 当前在 Claude 环境，AI 已可用"
+    : (d.apiKey ? "✓ 已配置 Key，AI 可用" : "未填写 Key：AI 排课不可用，报告会用本地分析");
 
   return (
     <React.Fragment>
@@ -2908,14 +3135,32 @@ function SettingsDrawer({ settings, onSave, onClose, onReset, onExport }) {
           </div>
           <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
           <div className="field">
-            <label className="field-label">AI 助手 · Anthropic API Key</label>
+            <label className="field-label">AI 助手 · 服务商</label>
             <p style={{ fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.6, margin: "0 0 10px" }}>
-              在 Claude 里使用时无需填写。若想<b>脱离 Claude、在自己浏览器或 Mac App 里也用 AI 排课与分析</b>，填入你的 API Key（仅存在本机浏览器，不上传）。获取：console.anthropic.com
+              在 Claude 里使用选「自动」即可，无需填 Key。<b>脱离 Claude（自己的网站 / Mac App）</b>时，选一个服务商并填入对应 API Key（仅存本机，不上传）。
             </p>
-            <input className="input" type="password" value={d.apiKey || ""} placeholder="sk-ant-..."
-              onChange={(e) => patch({ apiKey: e.target.value.trim() })} autoComplete="off" />
-            <div style={{ fontSize: 11.5, color: d.apiKey ? "oklch(0.6 0.14 150)" : "var(--ink-3)", marginTop: 6 }}>
-              {window.claude && window.claude.complete ? "✓ 当前在 Claude 环境，AI 已可用" : d.apiKey ? "✓ 已填入 Key，AI 可用" : "未填写：AI 排课不可用，分析会用本地算法"}
+            <div className="dur-quick" style={{ flexWrap: "wrap", marginBottom: 10 }}>
+              {AI_PROVIDERS.map(([val, label]) => (
+                <button key={val} className={prov === val ? "on" : ""} onClick={() => patch({ aiProvider: val })}>{label}</button>
+              ))}
+            </div>
+            {needKey && (
+              <React.Fragment>
+                <input className="input" type="password" value={d.apiKey || ""} placeholder={preset.keyHint} autoComplete="off"
+                  onChange={(e) => patch({ apiKey: e.target.value.trim() })} style={{ marginBottom: 8 }} />
+                {prov === "custom" && (
+                  <input className="input" type="text" value={d.aiBaseUrl || ""} placeholder="接口地址，如 https://api.xxx.com/v1" autoComplete="off"
+                    onChange={(e) => patch({ aiBaseUrl: e.target.value.trim() })} style={{ marginBottom: 8 }} />
+                )}
+                <input className="input" type="text" value={d.aiModel || ""} placeholder={"模型名（留空用默认：" + preset.model + "）"} autoComplete="off"
+                  onChange={(e) => patch({ aiModel: e.target.value.trim() })} />
+                <p style={{ fontSize: 11.5, color: "var(--ink-3)", lineHeight: 1.6, margin: "8px 0 0" }}>
+                  Key 获取：DeepSeek platform.deepseek.com · OpenAI platform.openai.com · Kimi platform.moonshot.cn · Claude console.anthropic.com。个别服务商可能限制浏览器直连（CORS），DeepSeek 通常可用。
+                </p>
+              </React.Fragment>
+            )}
+            <div style={{ fontSize: 11.5, color: (prov === "auto" && inClaude) || d.apiKey ? "oklch(0.6 0.14 150)" : "var(--ink-3)", marginTop: 8 }}>
+              {aiStatus}
             </div>
           </div>
           <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
@@ -2927,6 +3172,57 @@ function SettingsDrawer({ settings, onSave, onClose, onReset, onExport }) {
             <button className="btn btn-soft" onClick={onExport} style={{ width: "100%", justifyContent: "center" }}>
               <Icon name="download" size={16} /> 导出 .ics 日历文件
             </button>
+          </div>
+          <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
+          <div className="field">
+            <label className="field-label">云同步（多设备自动同步）</label>
+            {cloudEnabled ? (
+              <React.Fragment>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, marginBottom: 10, color: syncStatus === "error" ? "oklch(0.62 0.2 25)" : "oklch(0.55 0.13 150)" }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 99, background: syncStatus === "error" ? "oklch(0.62 0.2 25)" : syncStatus === "syncing" ? "var(--accent)" : "oklch(0.7 0.16 150)" }} />
+                  {syncStatus === "error" ? "同步出错，请检查网络 / Token" : syncStatus === "syncing" ? "正在同步…" : "已开启 · 数据自动同步"}
+                </div>
+                <p style={{ fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.6, margin: "0 0 12px" }}>
+                  在另一台设备的设置里，用<b>同一个 GitHub Token</b> 点连接，即可拉取相同数据；之后两边改动都会自动同步。
+                </p>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className="btn btn-soft" onClick={onSyncNow} style={{ flex: 1, justifyContent: "center" }}><Icon name="download" size={16} /> 立即同步</button>
+                  <button className="btn btn-ghost" style={{ color: "oklch(0.6 0.18 25)", flex: 1, justifyContent: "center" }} onClick={onDisconnectCloud}>断开</button>
+                </div>
+              </React.Fragment>
+            ) : (
+              <React.Fragment>
+                <p style={{ fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.6, margin: "0 0 10px" }}>
+                  用你的 <b>GitHub</b> 账号实现真正的云同步：数据存在你自己的一个私密 Gist 里，手机 / 电脑 / Mac App 自动保持一致。
+                </p>
+                <input className="input" type="password" value={tokenInput} placeholder="粘贴 GitHub Token（ghp_...）" autoComplete="off"
+                  onChange={(e) => setTokenInput(e.target.value.trim())} style={{ marginBottom: 8 }} />
+                <button className="btn btn-accent" onClick={() => onConnectCloud(tokenInput)} style={{ width: "100%", justifyContent: "center" }}
+                  disabled={syncStatus === "syncing"}>
+                  {syncStatus === "syncing" ? "连接中…" : "连接 GitHub，开启云同步"}
+                </button>
+                <p style={{ fontSize: 11.5, color: "var(--ink-3)", lineHeight: 1.7, margin: "10px 0 0" }}>
+                  获取 Token：GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate，勾选 <b>gist</b> 权限即可。Token 仅存本机，不会被同步到云端。
+                </p>
+              </React.Fragment>
+            )}
+          </div>
+          <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
+          <div className="field">
+            <label className="field-label">手动备份</label>
+            <p style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.6, margin: "0 0 12px" }}>
+              不想用云同步时，也可手动搬运：在原设备<b>导出备份</b>，传到新设备后<b>导入备份</b>。
+            </p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-soft" onClick={onExportBackup} style={{ flex: 1, justifyContent: "center" }}>
+                <Icon name="download" size={16} /> 导出备份
+              </button>
+              <button className="btn btn-soft" onClick={() => fileRef.current && fileRef.current.click()} style={{ flex: 1, justifyContent: "center" }}>
+                <Icon name="check" size={16} /> 导入备份
+              </button>
+            </div>
+            <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: "none" }}
+              onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) onImportBackup(f); e.target.value = ""; }} />
           </div>
           <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
           <button className="btn btn-ghost" style={{ color: "oklch(0.6 0.18 25)", width: "100%", justifyContent: "center" }}
@@ -2953,8 +3249,128 @@ function App() {
   const [reviewSubject, setReviewSubject] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
   const [toast, toastNode] = useToast();
+  const [syncStatus, setSyncStatus] = useState("idle"); // idle | syncing | ok | error
+  const syncRef = useRef({ lastJson: null, timer: null, pulling: false });
+  const stateRef = useRef(state); stateRef.current = state;
+  const cloudEnabled = !!(state.settings.syncEnabled && state.settings.syncToken && state.settings.syncGistId);
 
-  useEffect(() => { Da.save(state); window.CalData._apiKey = state.settings.apiKey || ""; }, [state]);
+  useEffect(() => { Da.save(state); window.CalData._aiSettings = state.settings; }, [state]);
+
+  // 云同步：内容变化后（防抖）推送到云端
+  const contentKey = (st) => { const p = Da.cloudPayload(st); delete p.updatedAt; return JSON.stringify(p); };
+  useEffect(() => {
+    if (!cloudEnabled) { syncRef.current.lastJson = null; return; }
+    const r = syncRef.current;
+    if (r.pulling) return;
+    const key = contentKey(state);
+    if (r.lastJson === null) { r.lastJson = key; return; } // 首次建立基准，不推送
+    if (key === r.lastJson) return;
+    clearTimeout(r.timer);
+    r.timer = setTimeout(async () => {
+      try {
+        setSyncStatus("syncing");
+        const payload = { ...Da.cloudPayload(state), updatedAt: Date.now() };
+        await Da.cloudWrite(state.settings.syncToken, state.settings.syncGistId, payload);
+        r.lastJson = key;
+        r.pulling = true;
+        setState((s) => ({ ...s, updatedAt: payload.updatedAt }));
+        setTimeout(() => { r.pulling = false; }, 0);
+        setSyncStatus("ok");
+      } catch (e) { setSyncStatus("error"); }
+    }, 2500);
+    return () => clearTimeout(r.timer);
+  }, [state, cloudEnabled]);
+
+  // 云同步：拉取云端（启用时 / 窗口重新获焦时），云端更新则采用
+  const pullCloud = useCallback(async () => {
+    const st = stateRef.current;
+    if (!(st.settings.syncEnabled && st.settings.syncToken && st.settings.syncGistId)) return;
+    try {
+      setSyncStatus("syncing");
+      const cloud = await Da.cloudRead(st.settings.syncToken, st.settings.syncGistId);
+      if (cloud) {
+        const localT = st.updatedAt || 0, cloudT = cloud.updatedAt || 0;
+        if (cloudT > localT) {
+          const merged = Da.mergeCloud(st, cloud);
+          const p = Da.cloudPayload(merged); delete p.updatedAt;
+          syncRef.current.lastJson = JSON.stringify(p);
+          syncRef.current.pulling = true;
+          setState(merged);
+          setTimeout(() => { syncRef.current.pulling = false; }, 0);
+        }
+      }
+      setSyncStatus("ok");
+    } catch (e) { setSyncStatus("error"); }
+  }, []);
+
+  useEffect(() => { if (cloudEnabled) pullCloud(); }, [cloudEnabled, pullCloud]);
+  useEffect(() => {
+    const onFocus = () => { if (stateRef.current.settings.syncEnabled) pullCloud(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => { window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onFocus); };
+  }, [pullCloud]);
+
+  const connectCloud = async (token) => {
+    token = (token || "").trim();
+    if (!token) { toast("请先填入 GitHub Token"); return; }
+    try {
+      setSyncStatus("syncing");
+      const base0 = stateRef.current;
+      let gistId = await Da.cloudFindGist(token);
+      const base = { ...base0, settings: { ...base0.settings, syncToken: token, syncGistId: gistId || "", syncEnabled: true } };
+      if (gistId) {
+        const cloud = await Da.cloudRead(token, gistId);
+        if (cloud && cloud.events && cloud.events.length) {
+          const useCloud = confirm("检测到云端已有日程数据。\n\n「确定」= 用云端数据覆盖本机（在新设备上请选这个）\n「取消」= 用本机数据覆盖云端");
+          if (useCloud) {
+            const merged = Da.mergeCloud(base, cloud);
+            const p = Da.cloudPayload(merged); delete p.updatedAt;
+            syncRef.current.lastJson = JSON.stringify(p);
+            setState(merged);
+          } else {
+            const payload = { ...Da.cloudPayload(base), updatedAt: Date.now() };
+            await Da.cloudWrite(token, gistId, payload);
+            const p = { ...payload }; delete p.updatedAt;
+            syncRef.current.lastJson = JSON.stringify(p);
+            setState({ ...base, updatedAt: payload.updatedAt });
+          }
+        } else {
+          const payload = { ...Da.cloudPayload(base), updatedAt: Date.now() };
+          await Da.cloudWrite(token, gistId, payload);
+          const p = { ...payload }; delete p.updatedAt;
+          syncRef.current.lastJson = JSON.stringify(p);
+          setState({ ...base, updatedAt: payload.updatedAt });
+        }
+      } else {
+        const payload = { ...Da.cloudPayload(base), updatedAt: Date.now() };
+        gistId = await Da.cloudCreateGist(token, payload);
+        const p = { ...payload }; delete p.updatedAt;
+        syncRef.current.lastJson = JSON.stringify(p);
+        setState({ ...base, updatedAt: payload.updatedAt, settings: { ...base.settings, syncGistId: gistId } });
+      }
+      setSyncStatus("ok");
+      toast("✓ 云同步已开启");
+    } catch (e) { setSyncStatus("error"); toast("连接失败：" + (e.message || e)); }
+  };
+  const disconnectCloud = () => {
+    setState((s) => ({ ...s, settings: { ...s.settings, syncEnabled: false } }));
+    syncRef.current.lastJson = null; setSyncStatus("idle");
+    toast("已断开云同步（云端数据保留）");
+  };
+  const syncNow = async () => {
+    const st = stateRef.current;
+    if (!st.settings.syncEnabled) return;
+    try {
+      setSyncStatus("syncing");
+      const payload = { ...Da.cloudPayload(st), updatedAt: Date.now() };
+      await Da.cloudWrite(st.settings.syncToken, st.settings.syncGistId, payload);
+      const p = { ...payload }; delete p.updatedAt;
+      syncRef.current.lastJson = JSON.stringify(p);
+      setState((s) => ({ ...s, updatedAt: payload.updatedAt }));
+      setSyncStatus("ok"); toast("已同步到云端");
+    } catch (e) { setSyncStatus("error"); toast("同步失败：" + (e.message || e)); }
+  };
 
   // 过滤隐藏科目
   const visibleEvents = useMemo(() => {
@@ -2972,6 +3388,7 @@ function App() {
     });
   };
   const deleteEvent = (id) => setState((s) => ({ ...s, events: s.events.filter((e) => e.id !== id) }));
+  const patchEvent = (id, patch) => setState((s) => ({ ...s, events: s.events.map((e) => (e.id === id ? { ...e, ...patch } : e)) }));
   const toggleSubject = (id) => setState((s) => {
     const hid = new Set(s.settings.hiddenSubjects || []);
     hid.has(id) ? hid.delete(id) : hid.add(id);
@@ -3009,10 +3426,21 @@ function App() {
 
   const goDay = (date) => { setAnchor(date); setView("day"); };
   const doExport = () => { Da.downloadICS(state); toast("已导出 备考日历.ics"); };
+  const doExportBackup = () => { Da.exportBackup(state); toast("已导出备份文件"); };
+  const doImportBackup = (file) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const s = Da.parseBackup(reader.result);
+        if (confirm("导入将覆盖当前设备上的全部数据，确定？")) { setState(s); toast("已导入备份"); }
+      } catch (err) { toast("导入失败：" + (err.message || err)); }
+    };
+    reader.readAsText(file);
+  };
 
   const viewProps = {
     anchor, events: visibleEvents, subjects: state.subjects, settings: state.settings,
-    onEvent: openEvent, onAdd: newEvent, onDay: goDay,
+    onEvent: openEvent, onAdd: newEvent, onDay: goDay, onPatch: patchEvent,
   };
 
   return (
@@ -3061,11 +3489,24 @@ function App() {
         </div>
       </div>
 
-      <button className="fab" onClick={() => newEvent(anchor)} title="添加任务"><Icon name="plus" size={26} stroke={2.4} /></button>
+      <div className="fab-stack">
+        <div className="fab-ai-wrap">
+          <span className="fab-ai-label">AI 排课</span>
+          <button className="fab fab-ai" onClick={() => setShowAI(true)} title="AI 排课"><ClaudeLogo size={26} /></button>
+        </div>
+        <button className="fab" onClick={() => newEvent(anchor)} title="添加任务"><Icon name="plus" size={26} stroke={2.4} /></button>
+      </div>
 
       {editing && (
         <EventDrawer event={editing} subjects={state.subjects}
-          onSave={(ev) => { if ((ev.title || "").trim() || ev._exists) upsertEvent(ev); }}
+          onSave={(ev, explicit) => {
+            const title = (ev.title || "").trim();
+            const hasTodos = (ev.todos || []).some((t) => (t.text || "").trim());
+            // 点“保存”始终入库（explicit）；仅随手点空白处关闭时丢弃空白新任务
+            if (!explicit && !title && !ev._exists && !hasTodos) return;
+            const subj = state.subjects.find((s) => s.id === ev.subjectId);
+            upsertEvent({ ...ev, title: title || (subj ? subj.name + " 学习" : "学习任务") });
+          }}
           onDelete={deleteEvent} onClose={() => setEditing(null)} />
       )}
       {showStats && <StatsModal events={state.events} subjects={state.subjects} settings={state.settings} anchor={anchor} onClose={() => setShowStats(false)} />}
@@ -3078,9 +3519,16 @@ function App() {
       {reviewSubject && <SubjectReviewModal subjectId={reviewSubject} state={state} setState={setState} onClose={() => setReviewSubject(null)} />}
       {showSettings && (
         <SettingsDrawer settings={state.settings}
-          onSave={(set) => setState((s) => ({ ...s, settings: set }))}
+          onSave={(set) => setState((s) => ({ ...s, settings: { ...set, syncToken: s.settings.syncToken, syncGistId: s.settings.syncGistId, syncEnabled: s.settings.syncEnabled } }))}
           onReset={() => { Da.reset(); setState(Da.defaultState()); }}
           onExport={doExport}
+          onExportBackup={doExportBackup}
+          onImportBackup={doImportBackup}
+          cloudEnabled={cloudEnabled}
+          syncStatus={syncStatus}
+          onConnectCloud={connectCloud}
+          onDisconnectCloud={disconnectCloud}
+          onSyncNow={syncNow}
           onClose={() => setShowSettings(false)} />
       )}
       {toastNode}
