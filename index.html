@@ -965,7 +965,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
         hiddenSubjects: [],
         motto: "千里之行，始于足下。今天也要踏实地走一步。",
         apiKey: "",
-        aiProvider: "auto", // auto | anthropic | openai | deepseek | kimi | custom
+        aiProvider: "deepseek", // auto | anthropic | openai | deepseek | kimi | custom
         aiBaseUrl: "",      // 仅自定义时使用
         aiModel: "",        // 留空则用该供应商默认模型
         syncToken: "",      // GitHub token（仅本机，不上传云端）
@@ -1033,15 +1033,35 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
   function getUsers() {
     try {
       const raw = localStorage.getItem(USERS_KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) return normalizeUsers(JSON.parse(raw));
     } catch(e) {}
     // 初始化：默认 admin 账号
-    const users = [{ username: "admin", passwordHash: DEFAULT_PASSHASH, role: "admin" }];
+    const users = [{ username: "admin", passwordHash: DEFAULT_PASSHASH, role: "admin", aiEnabled: true }];
     saveUsers(users);
     return users;
   }
   function saveUsers(users) {
     try { localStorage.setItem(USERS_KEY, JSON.stringify(users)); } catch(e) {}
+  }
+  function normalizeUsers(users) {
+    var changed = false;
+    var next = (Array.isArray(users) ? users : []).map(function(u) {
+      var nu = Object.assign({ role: "user", aiEnabled: true }, u || {});
+      if (nu.username === "admin") nu.role = "admin";
+      if (nu.aiEnabled == null) nu.aiEnabled = true;
+      if (JSON.stringify(nu) !== JSON.stringify(u)) changed = true;
+      return nu;
+    });
+    if (!next.find(function(u) { return u.username === "admin"; })) {
+      next.unshift({ username: "admin", passwordHash: DEFAULT_PASSHASH, role: "admin", aiEnabled: true });
+      changed = true;
+    }
+    if (changed) saveUsers(next);
+    return next;
+  }
+  function userAiEnabled(username) {
+    var u = getUsers().find(function(x) { return x.username === username; });
+    return !u || u.role === "admin" || u.aiEnabled !== false;
   }
   function getPasswordHash() {
     try {
@@ -1055,7 +1075,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
       var users = getUsers();
       var admin = users.find(function(u) { return u.username === "admin"; });
       if (admin) admin.passwordHash = hash;
-      else users.push({ username: "admin", passwordHash: hash, role: "admin" });
+      else users.push({ username: "admin", passwordHash: hash, role: "admin", aiEnabled: true });
       saveUsers(users);
     } catch(e) {}
   }
@@ -1090,7 +1110,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     if (!found) return false;
     var hash = await sha256(pass);
     if (hash === found.passwordHash) {
-      localStorage.setItem(LOGIN_KEY, JSON.stringify({ username: found.username, role: found.role }));
+      localStorage.setItem(LOGIN_KEY, JSON.stringify({ username: found.username, role: found.role, aiEnabled: found.aiEnabled !== false }));
       return true;
     }
     return false;
@@ -1100,9 +1120,9 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     var users = getUsers();
     if (users.find(function(u) { return u.username === user; })) return "账号已存在";
     var hash = await sha256(pass);
-    users.push({ username: user, passwordHash: hash, role: "user" });
+    users.push({ username: user, passwordHash: hash, role: "user", aiEnabled: true });
     saveUsers(users);
-    localStorage.setItem(LOGIN_KEY, JSON.stringify({ username: user, role: "user" }));
+    localStorage.setItem(LOGIN_KEY, JSON.stringify({ username: user, role: "user", aiEnabled: true }));
     return true;
   }
   function getLoggedInUser() {
@@ -1269,6 +1289,112 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     return { events, summary };
   }
 
+  async function applyAdminActions(state, actions) {
+    var nextState = JSON.parse(JSON.stringify(state));
+    var users = getUsers().slice();
+    var summary = [];
+    var saveUserState = function(username, userState) {
+      try { localStorage.setItem(KEY + "-" + username, JSON.stringify(userState)); } catch(e) {}
+    };
+    var loadUserState = function(username) {
+      if (!username || username === ((getLoggedInUser() || {}).username)) return nextState;
+      try {
+        var raw = localStorage.getItem(KEY + "-" + username);
+        if (raw) {
+          var parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.subjects) && Array.isArray(parsed.events)) return parsed;
+        }
+      } catch(e) {}
+      return defaultState();
+    };
+    var userExists = function(name) { return users.find(function(u) { return u.username === name; }); };
+    var persistUsers = false;
+
+    for (var i = 0; i < (actions || []).length; i++) {
+      var a = actions[i] || {};
+      var op = a.op || "";
+      var target = a.targetUser || a.username || ((getLoggedInUser() || {}).username);
+      if (!op) continue;
+
+      if (op === "user.create") {
+        if (!a.username || userExists(a.username)) continue;
+        var pass = a.password || "123456";
+        var hash = await sha256(pass);
+        users.push({ username: a.username, passwordHash: hash, role: a.role === "admin" ? "admin" : "user", aiEnabled: a.aiEnabled !== false });
+        saveUserState(a.username, defaultState());
+        persistUsers = true;
+        summary.push({ op: "create", text: "新增用户「" + a.username + "」" });
+      } else if (op === "user.delete") {
+        if (!a.username || a.username === "admin") continue;
+        users = users.filter(function(u) { return u.username !== a.username; });
+        try { localStorage.removeItem(KEY + "-" + a.username); } catch(e) {}
+        persistUsers = true;
+        summary.push({ op: "delete", text: "删除用户「" + a.username + "」" });
+      } else if (op === "user.role") {
+        var ur = userExists(target);
+        if (!ur) continue;
+        ur.role = a.role === "admin" ? "admin" : "user";
+        if (ur.username === "admin") ur.role = "admin";
+        persistUsers = true;
+        summary.push({ op: "update", text: "设置用户「" + target + "」角色为 " + ur.role });
+      } else if (op === "user.ai") {
+        var ua = userExists(target);
+        if (!ua) continue;
+        ua.aiEnabled = a.enabled !== false;
+        if (ua.role === "admin") ua.aiEnabled = true;
+        persistUsers = true;
+        summary.push({ op: "update", text: (ua.aiEnabled ? "开启" : "关闭") + "用户「" + target + "」AI 权限" });
+      } else if (op === "user.password") {
+        var up = userExists(target);
+        if (!up || !a.password) continue;
+        up.passwordHash = await sha256(a.password);
+        persistUsers = true;
+        summary.push({ op: "update", text: "重置用户「" + target + "」密码" });
+      } else if (op.indexOf("event.") === 0) {
+        var us = loadUserState(target);
+        var evActions = [Object.assign({}, a, { op: op.replace("event.", "") })];
+        var evResult = applyActions(us, evActions);
+        us.events = evResult.events;
+        if (target === ((getLoggedInUser() || {}).username)) nextState = us;
+        saveUserState(target, us);
+        summary = summary.concat(evResult.summary.map(function(x) { return Object.assign({}, x, { text: "用户「" + target + "」：" + x.text }); }));
+      } else if (op.indexOf("subject.") === 0) {
+        var ss = loadUserState(target);
+        var subj = resolveSubject(ss.subjects, a.name || a.subject);
+        if (op === "subject.create") {
+          if (!a.name || subj) continue;
+          var hue = a.hue != null ? +a.hue : Math.round(Math.random() * 330);
+          var ns = Object.assign({ id: uid("s"), name: a.name, group: a.group || "法考" }, subjColors(hue));
+          ss.subjects.push(ns);
+          summary.push({ op: "create", text: "用户「" + target + "」新增科目「" + a.name + "」" });
+        } else if (op === "subject.update" && subj) {
+          if (a.newName) subj.name = a.newName;
+          if (a.group) subj.group = a.group;
+          summary.push({ op: "update", text: "用户「" + target + "」修改科目「" + (a.name || a.subject) + "」" });
+        } else if (op === "subject.delete" && subj) {
+          ss.events = ss.events.filter(function(e) { return e.subjectId !== subj.id; });
+          ss.subjects = ss.subjects.filter(function(s) { return s.id !== subj.id; });
+          summary.push({ op: "delete", text: "用户「" + target + "」删除科目「" + subj.name + "」及相关日程" });
+        } else if ((op === "subject.hide" || op === "subject.show") && subj) {
+          var hid = new Set(ss.settings.hiddenSubjects || []);
+          op === "subject.hide" ? hid.add(subj.id) : hid.delete(subj.id);
+          ss.settings.hiddenSubjects = Array.from(hid);
+          summary.push({ op: "update", text: "用户「" + target + "」" + (op === "subject.hide" ? "隐藏" : "显示") + "科目「" + subj.name + "」" });
+        }
+        if (target === ((getLoggedInUser() || {}).username)) nextState = ss;
+        saveUserState(target, ss);
+      } else if (op === "settings.patch") {
+        var ps = loadUserState(target);
+        ps.settings = Object.assign({}, ps.settings || {}, a.settings || {});
+        if (target === ((getLoggedInUser() || {}).username)) nextState = ps;
+        saveUserState(target, ps);
+        summary.push({ op: "update", text: "更新用户「" + target + "」设置" });
+      }
+    }
+    if (persistUsers) saveUsers(users);
+    return { state: nextState, summary: summary };
+  }
+
   // 紧凑事件清单（喂给 AI，含 id 以便改/删）
   function compactEvents(state, from, to) {
     const subjById = {};
@@ -1309,29 +1435,58 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     custom:    { label: "自定义 (OpenAI 兼容)",  base: "",                              model: "gpt-4o-mini",            kind: "openai",    keyHint: "API Key" },
   };
 
+  function resolveAISettings(settings, mode) {
+    settings = settings || {};
+    var user = getLoggedInUser();
+    if (user && !userAiEnabled(user.username)) {
+      var blocked = new Error("AI_DISABLED");
+      blocked.code = "AI_DISABLED";
+      throw blocked;
+    }
+    var isAdminUser = !!(user && user.role === "admin");
+    var adminSettings = {};
+    try {
+      var adminRaw = localStorage.getItem(KEY + "-admin");
+      if (adminRaw) adminSettings = (JSON.parse(adminRaw).settings || {});
+    } catch(e) {}
+
+    var useDefaultDeepSeek = !isAdminUser && !(ADMIN_API_KEY || adminSettings.apiKey);
+    var adminProvider = adminSettings.aiProvider === "auto" ? "deepseek" : adminSettings.aiProvider;
+    var provider = isAdminUser
+      ? (settings.aiProvider || "deepseek")
+      : (useDefaultDeepSeek ? "deepseek" : (adminProvider || "deepseek"));
+    var prov = provider === "auto" ? "anthropic" : provider;
+    if (!isAdminUser && provider === "auto" && !(typeof window !== "undefined" && window.claude && window.claude.complete)) prov = "deepseek";
+
+    var preset = AI_PRESETS[prov] || AI_PRESETS.deepseek;
+    var apiKey = (isAdminUser ? settings.apiKey : (adminSettings.apiKey || ADMIN_API_KEY) || "").trim();
+    var base = (((isAdminUser ? settings.aiBaseUrl : adminSettings.aiBaseUrl) || preset.base) || "").replace(/\/+$/, "");
+    var model = ((isAdminUser ? settings.aiModel : adminSettings.aiModel) || "").trim();
+    if (!model && prov === "deepseek") model = (mode === "analysis") ? (preset.analysisModel || "deepseek-v4-pro") : (preset.chatModel || "deepseek-v4-flash");
+    if (!model) model = preset.model;
+
+    return { provider: provider, prov: prov, preset: preset, apiKey: apiKey, base: base, model: model };
+  }
+
   // 优先用 Claude 环境注入的 window.claude；否则按 settings 选择供应商直连。
   // settings 可为对象 {apiKey, aiProvider, aiBaseUrl, aiModel}；为兼容旧调用，也接受纯字符串(=apiKey)。
   // mode: "chat"(默认,快) | "analysis"(深,Pro) — DeepSeek 时自动切换模型
   async function aiComplete(prompt, settings, mode) {
     if (typeof settings === "string") settings = { apiKey: settings };
     settings = settings || (window.CalData && window.CalData._aiSettings) || {};
-    const provider = settings.aiProvider || "auto";
+    const resolved = resolveAISettings(settings, mode);
+    const provider = resolved.provider;
 
     // 自动模式：在 Claude 环境里直接用注入能力
     if (provider === "auto" && typeof window !== "undefined" && window.claude && window.claude.complete) {
       return await window.claude.complete(prompt);
     }
 
-    const key = (settings.apiKey || "").trim();
-    const prov = provider === "auto" ? "anthropic" : provider; // auto 但无 Claude → 按 Anthropic
-    const preset = AI_PRESETS[prov] || AI_PRESETS.anthropic;
-    const base = ((settings.aiBaseUrl || preset.base) || "").replace(/\/+$/, "");
-    // DeepSeek 双模型：chat → flash, analysis → pro
-    let model = (settings.aiModel || "").trim();
-    if (!model && prov === "deepseek") {
-      model = (mode === "analysis") ? (preset.analysisModel || "deepseek-v4-pro") : (preset.chatModel || "deepseek-v4-flash");
-    }
-    if (!model) model = preset.model;
+    const key = resolved.apiKey;
+    const prov = resolved.prov;
+    const preset = resolved.preset;
+    const base = resolved.base;
+    const model = resolved.model;
 
     if (!key || !base) { const e = new Error("NO_AI"); e.code = "NO_AI"; throw e; }
 
@@ -1362,7 +1517,13 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
   }
   function aiAvailable(state) {
-    return !!(typeof window !== "undefined" && ((window.claude && window.claude.complete) || (state && state.settings && state.settings.apiKey)));
+    try {
+      var user = getLoggedInUser();
+      if (user && !userAiEnabled(user.username)) return false;
+      if (typeof window !== "undefined" && window.claude && window.claude.complete) return true;
+      var r = resolveAISettings(state && state.settings, "chat");
+      return !!(r.base && r.apiKey);
+    } catch(e) { return false; }
   }
 
   // ---------- 备份 / 恢复（跨设备搬运数据） ----------
@@ -1431,7 +1592,13 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
       delete s.settings.syncEnabled;
     }
     allUsers[username] = s;
-    return { _multi: true, users: allUsers };
+    var accounts = [];
+    try {
+      accounts = getUsers().map(function(u) {
+        return { username: u.username, passwordHash: u.passwordHash, role: u.role, aiEnabled: u.aiEnabled !== false };
+      });
+    } catch(e4) {}
+    return { _multi: true, users: allUsers, accounts: accounts };
   }
   // 从多用户云端提取当前用户数据
   function mergeCloud(local, cloud) {
@@ -1443,6 +1610,9 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     if (cloud._multi && cloud.users) {
       // 缓存所有用户数据供管理员查看
       try { localStorage.setItem("_beikao-cloud-cache", JSON.stringify(cloud.users)); } catch(e) {}
+      if (Array.isArray(cloud.accounts) && cloud.accounts.length) {
+        try { saveUsers(normalizeUsers(cloud.accounts)); } catch(e0) {}
+      }
       userData = cloud.users[username] || cloud;
     }
 
@@ -1563,7 +1733,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     iso, parseISO, today, addDays, dow, startOfWeek, startOfMonth, endOfMonth, daysBetween,
     sameMonth, monthGrid, weekDays, DOW_CN, MONTH_CN, fmtMin, fmtHrs, minToTime, timeToMin, pad,
     eventCompletion, isEventDone, dayStats, rangeStats, buildICS, downloadICS, uid,
-    weekKey, monthKey, resolveSubject, applyActions, compactEvents, planProgress,
+    weekKey, monthKey, resolveSubject, applyActions, applyAdminActions, compactEvents, planProgress,
     aiComplete, aiAvailable, AI_PRESETS, exportBackup, parseBackup,
     cloudPayload, mergeCloud, cloudFindGist, cloudCreateGist, cloudRead, cloudWrite,
     weeksInMonth, subjectReview,
@@ -2688,6 +2858,7 @@ function parseJSONLoose(txt) {
   if (i >= 0 && j > i) t = t.slice(i, j + 1);
   try { return JSON.parse(t); } catch (e) { return null; }
 }
+window.parseJSONLoose = parseJSONLoose;
 
 function buildFileParsePrompt(state, fileContent, fileName) {
   const today = Dai.today();
@@ -2751,6 +2922,42 @@ function buildSchedulePrompt(state, userText) {
   ].join("\n");
 }
 
+function buildAdminPrompt(state, userText) {
+  const today = Dai.today();
+  const users = Dai.getUsers().map((u) => ({
+    username: u.username,
+    role: u.role,
+    aiEnabled: u.role === "admin" ? true : u.aiEnabled !== false,
+  }));
+  const evs = Dai.compactEvents(state, Dai.addDays(today, -14), Dai.addDays(today, 90));
+  const subjList = Dai.GROUP_ORDER.map((g) => g + "：" + state.subjects.filter((s) => s.group === g).map((s) => s.name).join("、")).join("\n");
+  return [
+    "你是备考日历的 admin 管理助手。当前登录者是 admin，可以按自然语言管理所有用户、admin 自己、日程、科目和 AI 权限。",
+    "今天是 " + today + "。请严格只输出 JSON 对象，不要 markdown：",
+    '{"reply":"中文说明","actions":[ ... ]}',
+    "可用用户：" + JSON.stringify(users),
+    "当前界面用户的科目：" + subjList,
+    "当前界面用户近期日程（id|日期|科目|开始|时长|标题|todo）：",
+    evs.length ? evs.join("\n") : "（暂无）",
+    "actions 支持：",
+    '用户：{"op":"user.create","username":"新用户名","password":"初始密码","role":"user/admin","aiEnabled":true/false}',
+    '用户：{"op":"user.delete","username":"用户名"}；不能删除 admin',
+    '用户：{"op":"user.role","targetUser":"用户名","role":"user/admin"}',
+    '用户：{"op":"user.ai","targetUser":"用户名","enabled":true/false}',
+    '用户：{"op":"user.password","targetUser":"用户名","password":"新密码"}',
+    '日程：{"op":"event.create","targetUser":"用户名","date":"YYYY-MM-DD","subject":"科目名","title":"标题","start":"HH:MM"或null,"durationMin":整数,"todos":["待办"]}',
+    '日程：{"op":"event.update","targetUser":"用户名","id":"事件id","date?":"...","subject?":"...","title?":"...","start?":"...","durationMin?":整数,"done?":true/false,"todos?":["..."]}',
+    '日程：{"op":"event.delete","targetUser":"用户名","id":"事件id"}',
+    '科目：{"op":"subject.create","targetUser":"用户名","name":"科目名","group":"法考/法学课程/保研","hue":0-360}',
+    '科目：{"op":"subject.update","targetUser":"用户名","name":"原科目名","newName?":"新名称","group?":"分组"}',
+    '科目：{"op":"subject.delete","targetUser":"用户名","name":"科目名"}',
+    '科目：{"op":"subject.hide","targetUser":"用户名","name":"科目名"} 或 {"op":"subject.show","targetUser":"用户名","name":"科目名"}',
+    '设置：{"op":"settings.patch","targetUser":"用户名","settings":{"dailyGoalMin":360,"motto":"..."}}',
+    "规则：targetUser 省略时表示 admin 当前自己；update/delete 日程只能使用已列出的真实 id；如果用户只是问问题而不需要改数据，actions 返回空数组。",
+    "用户指令：" + JSON.stringify(userText),
+  ].join("\n");
+}
+
 /* 语音识别 hook */
 function useVoice(onText) {
   const recRef = useRef(null);
@@ -2791,7 +2998,7 @@ function AssistantPanel({ state, setState, onClose, toast, initialMsg }) {
   const makeInitMsgs = () => {
     if (initialMsg && initialMsg.headline) {
       return [
-        { role: "ai", text: "以下是「' + initialMsg.headline + '」的分析报告。你可以问我任何关于这份报告的问题，比如：\n· 哪些科目需要重点关注？\n· 如何提高某个薄弱子项？\n· 帮我制定下阶段学习计划" },
+        { role: "ai", text: "以下是「" + initialMsg.headline + "」的分析报告。你可以问我任何关于这份报告的问题，比如：\n· 哪些科目需要重点关注？\n· 如何提高某个薄弱子项？\n· 帮我制定下阶段学习计划" },
       ];
     }
     // 如果有历史记录，恢复；否则显示欢迎语
@@ -2839,16 +3046,31 @@ function AssistantPanel({ state, setState, onClose, toast, initialMsg }) {
     setMsgs((m) => [...m, { role: "user", text: q }]);
     setBusy(true);
     if (!Dai.aiAvailable(state)) {
-      setMsgs((m) => [...m, { role: "ai", text: "⚠️ 还没接入 AI。请点右上角「设置」选择 AI 服务商（如 DeepSeek / OpenAI / Claude）并填入 API Key，即可在任意浏览器里使用 AI 排课。", needKey: true }]);
+      const u = Dai.getLoggedInUser();
+      const blocked = u && Dai.getUsers().find((x) => x.username === u.username && x.aiEnabled === false && x.role !== "admin");
+      setMsgs((m) => [...m, { role: "ai", text: blocked ? "你的 AI 权限已被管理员关闭，请联系 admin 开启。" : "⚠️ AI 默认使用 DeepSeek Flash。当前还缺少可用 API Key：请 admin 在设置中配置一次，普通用户无需查看或填写 API 与模型信息。", needKey: true }]);
       setBusy(false); return;
     }
     try {
       // 智能判断：排课指令 vs 通用问答
-      const scheduleKw = /排|安排|添加|加一节|挪到|删除|取消|改|调整|计划|日程|课|节|学习块|几点|小时|分钟|每天|每周/g;
+      const isAdminUser = !!(Dai.getLoggedInUser() && Dai.getLoggedInUser().role === "admin");
+      const adminKw = /用户|账号|账户|权限|AI权限|开启AI|关闭AI|禁用AI|启用AI|密码|角色|管理员|admin|删除用户|新增用户|新建用户/g;
+      const scheduleKw = /排|安排|添加|新增|加一节|挪到|删除|取消|改|调整|计划|日程|课|节|学习块|几点|小时|分钟|每天|每周|科目|隐藏|显示/g;
+      const isAdminAction = isAdminUser && adminKw.test(q);
       const isSchedule = scheduleKw.test(q);
-      const prompt = isSchedule ? buildSchedulePrompt(state, q) : buildChatPrompt(state, q);
+      const prompt = isAdminAction ? buildAdminPrompt(state, q) : (isSchedule ? buildSchedulePrompt(state, q) : buildChatPrompt(state, q));
       const raw = await Dai.aiComplete(prompt, state.settings, "chat");
-      if (isSchedule) {
+      if (isAdminAction) {
+        const data = parseJSONLoose(raw);
+        if (!data || !Array.isArray(data.actions)) {
+          setMsgs((m) => [...m, { role: "ai", text: raw && raw.trim() ? raw.trim() : "admin 指令没有解析成功，请换种说法。" }]);
+          setBusy(false); return;
+        }
+        const result = await Dai.applyAdminActions(state, data.actions);
+        setState(result.state);
+        setMsgs((m) => [...m, { role: "ai", text: data.reply || "已执行 admin 指令", summary: result.summary }]);
+        toast && toast(`已执行 ${result.summary.length} 项管理操作`);
+      } else if (isSchedule) {
         const data = parseJSONLoose(raw);
         if (!data || !Array.isArray(data.actions)) {
           setMsgs((m) => [...m, { role: "ai", text: raw && raw.trim() ? raw.trim() : "我没太理解，换种说法再试一次？（比如指明科目、日期、时长）" }]);
@@ -4029,7 +4251,7 @@ function SettingsDrawer({ settings, onSave, onClose, onReset, onExport, onExport
           </div>
           <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
           <div className="field">
-            <label className="field-label">AI 助手 · 服务商 {!isAdminUser && <span style={{fontSize:11,color:"var(--ink-3)",fontWeight:400}}>（仅管理员）</span>}</label>
+            <label className="field-label">AI 助手 · 服务商 {!isAdminUser && <span style={{fontSize:11,color:"var(--ink-3)",fontWeight:400}}>（由管理员统一配置）</span>}</label>
             {isAdminUser ? (
               <React.Fragment>
             <div style={{ background: "var(--bg-soft)", borderRadius: "var(--r-md)", padding: "10px 13px", marginBottom: 12, display: "flex", alignItems: "center", gap: 9 }}>
@@ -4070,8 +4292,8 @@ function SettingsDrawer({ settings, onSave, onClose, onReset, onExport, onExport
           </React.Fragment>
             ) : (
               <div style={{ background: "var(--bg-soft)", borderRadius: "var(--r-md)", padding: "16px", textAlign: "center" }}>
-                <p style={{ fontSize: 13, color: "var(--ink-2)", margin: 0 }}>
-                  AI 助手功能仅限管理员账号使用。<br/>如需使用，请联系管理员。
+                <p style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.7, margin: 0 }}>
+                  AI 助手已默认接入 DeepSeek Flash。<br/>API Key、模型和接口信息由 admin 管理，普通用户不可查看或修改。
                 </p>
               </div>
             )}
