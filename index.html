@@ -808,8 +808,8 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
   const PASSHASH_KEY = "beikao-cal-passhash";
   const DEFAULT_PASSHASH = "4bfcc619ba0c4f0c5785de73cc29b94bbc102534fe4ece861c294ec305e105b5"; // tt123456
   const USERS_KEY = "beikao-cal-users";
-  const ADMIN_API_KEY = "sk-eda11c9a10214e68a6fdbd1c66d9f1eb";
-  const SYNC_TOKEN = "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";
+  const ADMIN_API_KEY = "";
+  const SYNC_TOKEN = "";
 
   // ---------- 颜色：浅色多巴胺，按色相均匀分布 ----------
   function subjColors(hue) {
@@ -1506,7 +1506,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
   }
 
   window.CalData = {
-    KEY, LOGIN_KEY, USERS_KEY, PASSHASH_KEY, DEFAULT_PASSHASH, ADMIN_API_KEY, SYNC_TOKEN,
+    KEY, LOGIN_KEY, USERS_KEY, PASSHASH_KEY, DEFAULT_PASSHASH,
     getUsers, saveUsers, getPasswordHash, setPasswordHash, changePassword,
     isLoggedIn, doLogin, doRegister, getLoggedInUser, isAdmin, doLogout,
     defaultState, load, save, reset, defaultSubjects, GROUP_ORDER, subjColors,
@@ -3892,18 +3892,18 @@ function SettingsDrawer({ settings, onSave, onClose, onReset, onExport, onExport
                 <p style={{ fontSize: 11.5, color: "var(--ink-3)", lineHeight: 1.6, margin: "8px 0 0" }}>
                   Key 获取：DeepSeek platform.deepseek.com · OpenAI platform.openai.com · Kimi platform.moonshot.cn · Claude console.anthropic.com。个别服务商可能限制浏览器直连（CORS），DeepSeek 通常可用。
                 </p>
-              </React.Fragment>
             )}
             <button className="btn btn-accent" onClick={save} style={{ width: "100%", justifyContent: "center", marginTop: 12 }}>
               <Icon name="check" size={15} stroke={2.6} /> 保存 AI 设置
-                          </React.Fragment>
+            </button>
+          </React.Fragment>
             ) : (
               <div style={{ background: "var(--bg-soft)", borderRadius: "var(--r-md)", padding: "16px", textAlign: "center" }}>
                 <p style={{ fontSize: 13, color: "var(--ink-2)", margin: 0 }}>
                   AI 助手功能仅限管理员账号使用。<br/>如需使用，请联系管理员。
                 </p>
               </div>
-            )}</button>
+            )}
           </div>
           <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
           <div className="field">
@@ -4107,43 +4107,13 @@ function App() {
 
   const handleLogout = () => { Da.doLogout(); setLoggedIn(false); };
 
-  // 登录后：Admin 自动注入 API Key + 云同步 Token，普通用户仅自动连接云端（如有）
+  // 登录后：若已开启云同步则拉取数据；管理员可手动在设置中配置 API Key 和云同步 Token
   const autoSyncRef = useRef(false);
   useEffect(() => {
     if (!loggedIn || autoSyncRef.current) return;
     autoSyncRef.current = true;
     const isAdminUser = Da.isAdmin();
     const st = stateRef.current;
-
-    // —— Admin：自动注入预置的 API Key 和同步 Token（尚未手动配置时） ——
-    if (isAdminUser) {
-      let needsUpdate = false;
-      const nextSettings = { ...st.settings };
-      if (!nextSettings.apiKey && Da.ADMIN_API_KEY) {
-        nextSettings.apiKey = Da.ADMIN_API_KEY;
-        nextSettings.aiProvider = "openai";
-        needsUpdate = true;
-      }
-      if (!nextSettings.syncToken && Da.SYNC_TOKEN) {
-        nextSettings.syncToken = Da.SYNC_TOKEN;
-        needsUpdate = true;
-      }
-      if (needsUpdate) {
-        const updated = { ...st, settings: nextSettings };
-        setState(updated);
-        Da.save(updated);
-        // 注入后立即尝试连接云端
-        if (Da.SYNC_TOKEN && !st.settings.syncGistId) {
-          setTimeout(() => connectCloud(Da.SYNC_TOKEN), 500);
-          return;
-        }
-        if (updated.settings.syncEnabled && updated.settings.syncToken && updated.settings.syncGistId) {
-          setTimeout(() => pullCloud(), 500);
-          return;
-        }
-        return;
-      }
-    }
 
     // 如果已经开启了云同步，拉取一下云端最新数据
     if (st.settings.syncEnabled && st.settings.syncToken && st.settings.syncGistId) {
@@ -4153,13 +4123,6 @@ function App() {
     // Admin 已配置 syncToken 但未连接，自动连接
     if (isAdminUser && st.settings.syncToken && !st.settings.syncGistId) {
       connectCloud(st.settings.syncToken);
-      return;
-    }
-    // 否则尝试用内置 Token 自动连接
-    const token = Da.SYNC_TOKEN;
-    if (!token || token.includes("PLACEHOLDER")) return;
-    if (isAdminUser) {
-      connectCloud(token);
     }
   }, [loggedIn]);
   const cloudEnabled = !!(state.settings.syncEnabled && state.settings.syncToken && state.settings.syncGistId);
