@@ -1079,6 +1079,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     });
   }
   function isLoggedIn() {
+    doLogout(); // 每次打开页面清除登录状态，强制重新登录
     // 默认未登录，每次打开页面都需要重新登录
     return false;
   }
@@ -1435,7 +1436,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
   // 从多用户云端提取当前用户数据
   function mergeCloud(local, cloud) {
     var username = (getLoggedInUser() || {}).username || "guest";
-    var isAdmin = !!(getLoggedInUser() || {}).role === "admin";
+    var isAdmin = ((getLoggedInUser() || {}).role === "admin");
 
     // 多用户格式：提取当前用户
     var userData = cloud;
@@ -1446,6 +1447,8 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     }
 
     var m = JSON.parse(JSON.stringify(userData || cloud));
+    if (!Array.isArray(m.events)) m.events = [];
+    if (!Array.isArray(m.subjects)) m.subjects = defaultSubjects();
     if (!m.settings) m.settings = {};
 
     // 保留本机秘密设置
@@ -3454,7 +3457,7 @@ function GoalRow({ row, subjects, usedSubjectIds, realDone, onChange, onRemove }
 
 // ---------- PDF 导出（排版HTML → 浏览器打印） ----------
 // 格式：全文宋体四号(14pt)，除一级标题(h4)外全部首行缩进，行距1.5
-function generatePrintHTML(analysis, rows, state, gathered, totDone, totTarget, activeDays) {
+function generateWordHTML(analysis, rows, state, gathered, totDone, totTarget, activeDays) {
   const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
   let bodyHtml = '';
@@ -3746,58 +3749,44 @@ function ReportModal({ state, setState, onClose, anchor, toast, onOpenAI }) {
           )}
 
           {step === "loading" && (
-            <div style={{ padding: "30px 20px" }}>
-              <div style={{ textAlign: "center", marginBottom: 28 }}>
-                <div className="ai-typing" style={{ justifyContent: "center", marginBottom: 12 }}><i /><i /><i /></div>
-                <div style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "var(--ink)", marginBottom: 4 }}>
-                  AI 正在生成{gathered.label}分析报告
-                </div>
-                <div style={{ fontSize: 13, color: "var(--accent-ink)", fontWeight: 600 }}>
-                  {progress.thinking || "准备中…"}
-                </div>
+            <div style={{ textAlign: "center", padding: "50px 20px" }}>
+              <div className="ai-typing" style={{ justifyContent: "center", marginBottom: 16 }}><i /><i /><i /></div>
+              <div style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "var(--ink)", marginBottom: 8 }}>
+                AI 正在生成{gathered.label}分析报告
               </div>
-              <div style={{ maxWidth: 420, margin: "0 auto" }}>
-                {(progress.steps || []).map(function(s, i) {
-                  var icon = s.status === "done" ? "✓" : s.status === "active" ? "●" : "○";
-                  var color = s.status === "done" ? "oklch(0.65 0.14 150)" : s.status === "active" ? "var(--accent-ink)" : "var(--ink-3)";
-                  var weight = s.status === "active" ? 700 : 400;
-                  return (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", opacity: s.status === "pending" ? 0.45 : 1, transition: "all 0.3s" }}>
-                      <span style={{ fontSize: 14, color: color, fontWeight: 700, width: 20, textAlign: "center", flexShrink: 0 }}>{icon}</span>
-                      <span style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: weight }}>{s.text}</span>
-                      {s.status === "active" && <span className="ai-typing" style={{ display: "inline-flex", gap: 3, marginLeft: 4 }}><i style={{ width: 4, height: 4 }} /><i style={{ width: 4, height: 4 }} /><i style={{ width: 4, height: 4 }} /></span>}
-                    </div>
-                  );
-                })}
+              <div style={{ fontSize: 14, color: "var(--accent-ink)", fontWeight: 600, marginBottom: 24 }}>
+                {progress.thinking || "正在分析学习数据…"}
               </div>
+              {(progress.steps || []).map(function(s, i) {
+                return (
+                  <div key={i} style={{ display: "inline-flex", alignItems: "center", gap: 16, padding: "6px 0", marginRight: 20, opacity: s.status === "pending" ? 0.35 : 1 }}>
+                    <span style={{ color: s.status === "done" ? "oklch(0.65 0.14 150)" : s.status === "active" ? "var(--accent-ink)" : "var(--ink-3)", fontWeight: 700, fontSize: 13 }}>
+                      {s.status === "done" ? "✓" : s.status === "active" ? "●" : "○"} {s.text}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           )}
 
           {exporting && (
-            <div style={{ padding: "30px 20px" }}>
-              <div style={{ textAlign: "center", marginBottom: 28 }}>
-                <div className="ai-typing" style={{ justifyContent: "center", marginBottom: 12 }}><i /><i /><i /></div>
-                <div style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "var(--ink)", marginBottom: 4 }}>
-                  正在生成 Word 报告
-                </div>
-                <div style={{ fontSize: 13, color: "var(--accent-ink)", fontWeight: 600 }}>
-                  {progress.thinking || "准备中…"}
-                </div>
+            <div style={{ textAlign: "center", padding: "50px 20px" }}>
+              <div className="ai-typing" style={{ justifyContent: "center", marginBottom: 16 }}><i /><i /><i /></div>
+              <div style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "var(--ink)", marginBottom: 8 }}>
+                正在生成 Word 报告
               </div>
-              <div style={{ maxWidth: 420, margin: "0 auto" }}>
-                {(progress.steps || []).map(function(s, i) {
-                  var icon = s.status === "done" ? "✓" : s.status === "active" ? "●" : "○";
-                  var color = s.status === "done" ? "oklch(0.65 0.14 150)" : s.status === "active" ? "var(--accent-ink)" : "var(--ink-3)";
-                  var weight = s.status === "active" ? 700 : 400;
-                  return (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", opacity: s.status === "pending" ? 0.45 : 1, transition: "all 0.3s" }}>
-                      <span style={{ fontSize: 14, color: color, fontWeight: 700, width: 20, textAlign: "center", flexShrink: 0 }}>{icon}</span>
-                      <span style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: weight }}>{s.text}</span>
-                      {s.status === "active" && <span className="ai-typing" style={{ display: "inline-flex", gap: 3, marginLeft: 4 }}><i style={{ width: 4, height: 4 }} /><i style={{ width: 4, height: 4 }} /><i style={{ width: 4, height: 4 }} /></span>}
-                    </div>
-                  );
-                })}
+              <div style={{ fontSize: 14, color: "var(--accent-ink)", fontWeight: 600, marginBottom: 24 }}>
+                {progress.thinking || "正在逐科撰写分析…"}
               </div>
+              {(progress.steps || []).map(function(s, i) {
+                return (
+                  <div key={i} style={{ display: "inline-flex", alignItems: "center", gap: 16, padding: "6px 0", marginRight: 20, opacity: s.status === "pending" ? 0.35 : 1 }}>
+                    <span style={{ color: s.status === "done" ? "oklch(0.65 0.14 150)" : s.status === "active" ? "var(--accent-ink)" : "var(--ink-3)", fontWeight: 700, fontSize: 13 }}>
+                      {s.status === "done" ? "✓" : s.status === "active" ? "●" : "○"} {s.text}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -4349,7 +4338,7 @@ function App() {
   const syncRef = useRef({ lastJson: null, timer: null, pulling: false });
   const stateRef = useRef(state); stateRef.current = state;
 
-  const handleLogout = () => { Da.doLogout(); setLoggedIn(false); autoSyncRef.current = false; };
+  const handleLogout = () => { if (!viewAsUser) Da.save(state); Da.doLogout(); setViewAsUser(null); setLoggedIn(false); autoSyncRef.current = false; syncRef.current.lastJson = null; setSyncStatus("idle"); setState(Da.defaultState()); stateRef.current = Da.defaultState(); };
 
   // 登录后：重新加载用户数据、检查云同步配置
   const autoSyncRef = useRef(false);
@@ -4641,7 +4630,7 @@ function App() {
       </div>
 
       <div className="main">
-        <Sidebar collapsed={collapsed} state={state} setState={setState} anchor={anchor} viewAsUser={viewAsUser} onViewAsUser={(u) => { if (u) { var raw = localStorage.getItem(Da.KEY + "-" + u); if (raw) { try { var d = JSON.parse(raw); if (!d || !d.subjects || !d.events) { toast("该用户数据不完整，请先同步云端"); return; } d.settings = Object.assign({}, state.settings, d.settings || {}); setState(d); setViewAsUser(u); } catch(e) { toast("加载失败"); } } else { toast("该用户暂无本地数据，请先同步云端"); } } else { setViewAsUser(null); var s = Da.load(); if (s && s.subjects && s.events) { setState(s); stateRef.current = s; } } }}
+        <Sidebar collapsed={collapsed} state={state} setState={setState} anchor={anchor} viewAsUser={viewAsUser} onViewAsUser={(u) => { if (u) { if (viewAsUser) { try { localStorage.setItem(Da.KEY + "-" + viewAsUser, JSON.stringify(state)); } catch(e) {} } else { Da.save(state); } var raw = localStorage.getItem(Da.KEY + "-" + u); if (raw) { try { var d = JSON.parse(raw); if (d && Array.isArray(d.subjects) && Array.isArray(d.events)) { d.settings = Object.assign({}, state.settings, d.settings || {}); setState(d); stateRef.current = d; setViewAsUser(u); return; } } catch(e) {} } try { var cache = localStorage.getItem("_beikao-cloud-cache"); if (cache) { var users = JSON.parse(cache); if (users[u] && Array.isArray(users[u].subjects) && Array.isArray(users[u].events)) { var cd = users[u]; cd.settings = Object.assign({}, state.settings, cd.settings || {}); setState(cd); stateRef.current = cd; setViewAsUser(u); return; } } } catch(e2) {} toast("该用户暂无数据，请先同步云端"); } else { if (viewAsUser) { try { localStorage.setItem(Da.KEY + "-" + viewAsUser, JSON.stringify(state)); } catch(e) {} } setViewAsUser(null); var s = Da.load(); if (s && Array.isArray(s.subjects) && Array.isArray(s.events)) { setState(s); stateRef.current = s; } } }}
           onManageCountdown={() => setShowCountdownMgr(true)}
           onReviewSubject={(id) => setReviewSubject(id)}
           toggleSubject={toggleSubject} />
