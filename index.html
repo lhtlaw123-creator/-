@@ -503,7 +503,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
 .ai-head { display: flex; align-items: center; gap: 11px; padding: 15px 16px 13px; border-bottom: 1px solid var(--line); }
 .ai-mark { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; color: #fff;
   background: linear-gradient(140deg, oklch(0.78 0.13 35), oklch(0.74 0.13 350)); box-shadow: var(--shadow-sm); }
-.ai-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.ai-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-height: 0; -webkit-overflow-scrolling: touch; }
 .ai-msg { display: flex; }
 .ai-msg.user { justify-content: flex-end; }
 .ai-bubble { max-width: 85%; padding: 10px 13px; border-radius: 16px; font-size: 13.5px; line-height: 1.55; }
@@ -714,7 +714,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
 
   /* AI面板全屏 */
   .ai-panel { width: 100vw; max-width: 100vw; right: 0; bottom: 0; height: 100vh; max-height: 100vh; border-radius: 0; }
-  .ai-body { padding: 12px; }
+  .ai-body { padding: 12px; min-height: 0; }
   .ai-bubble { font-size: 13px; }
 
   /* 登录卡片 */
@@ -770,12 +770,17 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
 .login-error { font-size: 12.5px; color: oklch(0.62 0.18 25); background: oklch(0.95 0.04 25); padding: 8px 12px; border-radius: var(--r-sm); display: none; }
 .login-error.show { display: block; }
 .login-btn {
-  width: 100%; padding: 12px; border-radius: var(--r-md);
-  background: var(--ink); color: #fff; font-size: 15px; font-weight: 700;
+  width: 100%; padding: 14px 12px; border-radius: var(--r-md);
+  background: var(--ink); color: #fff; font-size: 16px; font-weight: 700;
   transition: all 0.18s var(--ease);
+  -webkit-appearance: none; touch-action: manipulation; user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 .login-btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
 .login-btn:active { transform: scale(0.98); }
+.login-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.login-toggle { font-size: 12.5px; color: var(--ink-3); cursor: pointer; user-select: none; transition: color 0.15s; }
+.login-toggle:hover { color: var(--accent-ink); }
 
 </style>
 </head>
@@ -800,9 +805,11 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
 (function () {
   const KEY = "beikao-cal-v2";
   const LOGIN_KEY = "beikao-cal-login";
-  // 云同步 Token —— 需在 GitHub 创建含 gist 权限的 Personal Access Token 后替换此处
-  // 创建地址：https://github.com/settings/tokens → Generate new token (classic) → 勾选 gist
-  const SYNC_TOKEN = "github_pat_PLACEHOLDER_REPLACE_WITH_YOUR_TOKEN";
+  const PASSHASH_KEY = "beikao-cal-passhash";
+  const DEFAULT_PASSHASH = "4bfcc619ba0c4f0c5785de73cc29b94bbc102534fe4ece861c294ec305e105b5"; // tt123456
+  const USERS_KEY = "beikao-cal-users";
+  const ADMIN_API_KEY = "sk-eda11c9a10214e68a6fdbd1c66d9f1eb";
+  const SYNC_TOKEN = "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";
 
   // ---------- 颜色：浅色多巴胺，按色相均匀分布 ----------
   function subjColors(hue) {
@@ -959,6 +966,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
         syncEnabled: false,
         activeCountdown: 0,
         aiChatHistory: [], // AI 对话记录 [{role,text}]
+        passwordHash: "", // 密码哈希（云端同步，本机用localStorage）
       },
       updatedAt: Date.now(),
       countdowns: [
@@ -1004,6 +1012,48 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { console.warn("save fail", e); }
   }
   function reset() { localStorage.removeItem(KEY); }
+  // ---------- 多用户系统 ----------
+  function getUsers() {
+    try {
+      const raw = localStorage.getItem(USERS_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch(e) {}
+    // 初始化：默认 admin 账号
+    const users = [{ username: "admin", passwordHash: DEFAULT_PASSHASH, role: "admin" }];
+    saveUsers(users);
+    return users;
+  }
+  function saveUsers(users) {
+    try { localStorage.setItem(USERS_KEY, JSON.stringify(users)); } catch(e) {}
+  }
+  function getPasswordHash() {
+    try {
+      const users = getUsers();
+      const admin = users.find(function(u) { return u.username === "admin"; });
+      return (admin && admin.passwordHash) || DEFAULT_PASSHASH;
+    } catch(e) { return DEFAULT_PASSHASH; }
+  }
+  function setPasswordHash(hash) {
+    try {
+      var users = getUsers();
+      var admin = users.find(function(u) { return u.username === "admin"; });
+      if (admin) admin.passwordHash = hash;
+      else users.push({ username: "admin", passwordHash: hash, role: "admin" });
+      saveUsers(users);
+    } catch(e) {}
+  }
+  async function changePassword(oldPass, newPass) {
+    var users = getUsers();
+    var cur = getLoggedInUser();
+    if (!cur) return false;
+    var oldHash = await sha256(oldPass);
+    var idx = users.findIndex(function(u) { return u.username === cur.username; });
+    if (idx < 0 || users[idx].passwordHash !== oldHash) return false;
+    var newHash = await sha256(newPass);
+    users[idx].passwordHash = newHash;
+    saveUsers(users);
+    return true;
+  }
   function sha256(str) {
     const encoder = new TextEncoder();
     const data = encoder.encode(str);
@@ -1011,17 +1061,54 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
       return Array.from(new Uint8Array(hash)).map(function(b) { return b.toString(16).padStart(2, "0"); }).join("");
     });
   }
-  function isLoggedIn() { try { return localStorage.getItem(LOGIN_KEY) === "1"; } catch(e) { return false; } }
+  function isLoggedIn() {
+    try {
+      var v = localStorage.getItem(LOGIN_KEY);
+      if (!v) return false;
+      if (v === "1") {
+        // 迁移旧 login 标记
+        localStorage.setItem(LOGIN_KEY, JSON.stringify({ username: "admin", role: "admin" }));
+        return true;
+      }
+      var u = JSON.parse(v);
+      return !!(u && u.username);
+    } catch(e) { return false; }
+  }
   async function doLogin(user, pass) {
-    if (user !== "admin") return false;
-    const hash = await sha256(pass);
-    if (hash === "4bfcc619ba0c4f0c5785de73cc29b94bbc102534fe4ece861c294ec305e105b5") {
-      localStorage.setItem(LOGIN_KEY, "1");
+    if (!user || !pass) return false;
+    var users = getUsers();
+    var found = users.find(function(u) { return u.username === user; });
+    if (!found) return false;
+    var hash = await sha256(pass);
+    if (hash === found.passwordHash) {
+      localStorage.setItem(LOGIN_KEY, JSON.stringify({ username: found.username, role: found.role }));
       return true;
     }
     return false;
   }
+  async function doRegister(user, pass) {
+    if (!user || !pass || pass.length < 6) return "密码至少6位";
+    var users = getUsers();
+    if (users.find(function(u) { return u.username === user; })) return "账号已存在";
+    var hash = await sha256(pass);
+    users.push({ username: user, passwordHash: hash, role: "user" });
+    saveUsers(users);
+    localStorage.setItem(LOGIN_KEY, JSON.stringify({ username: user, role: "user" }));
+    return true;
+  }
+  function getLoggedInUser() {
+    try {
+      var v = localStorage.getItem(LOGIN_KEY);
+      if (!v || v === "1") return { username: "admin", role: "admin" };
+      return JSON.parse(v);
+    } catch(e) { return null; }
+  }
+  function isAdmin() {
+    var u = getLoggedInUser();
+    return !!(u && u.role === "admin");
+  }
   function doLogout() { localStorage.removeItem(LOGIN_KEY); }
+
 
   // ---------- 统计聚合 ----------
   function eventCompletion(ev) {
@@ -1419,8 +1506,10 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
   }
 
   window.CalData = {
-    LOGIN_KEY, SYNC_TOKEN, isLoggedIn, doLogin, doLogout,
-    KEY, LOGIN_KEY, SYNC_TOKEN, defaultState, load, save, reset, isLoggedIn, doLogin, doLogout, defaultSubjects, GROUP_ORDER, subjColors,
+    KEY, LOGIN_KEY, USERS_KEY, PASSHASH_KEY, DEFAULT_PASSHASH, ADMIN_API_KEY, SYNC_TOKEN,
+    getUsers, saveUsers, getPasswordHash, setPasswordHash, changePassword,
+    isLoggedIn, doLogin, doRegister, getLoggedInUser, isAdmin, doLogout,
+    defaultState, load, save, reset, defaultSubjects, GROUP_ORDER, subjColors,
     iso, parseISO, today, addDays, dow, startOfWeek, startOfMonth, endOfMonth, daysBetween,
     sameMonth, monthGrid, weekDays, DOW_CN, MONTH_CN, fmtMin, fmtHrs, minToTime, timeToMin, pad,
     eventCompletion, isEventDone, dayStats, rangeStats, buildICS, downloadICS, uid,
@@ -3704,6 +3793,34 @@ function SettingsDrawer({ settings, onSave, onClose, onReset, onExport, onExport
   const [show, setShow] = useState(false);
   const [d, setD] = useState(settings);
   const [tokenInput, setTokenInput] = useState("");
+  // 修改密码
+  const [pwOld, setPwOld] = useState("");
+  const [pwNew, setPwNew] = useState("");
+  const [pwNew2, setPwNew2] = useState("");
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwMsg, setPwMsg] = useState("");
+  const [pwOk, setPwOk] = useState(false);
+
+  const doChangePw = async () => {
+    setPwMsg(""); setPwOk(false);
+    if (!pwOld) { setPwMsg("请输入当前密码"); return; }
+    if (!pwNew || pwNew.length < 6) { setPwMsg("新密码至少6位"); return; }
+    if (pwNew !== pwNew2) { setPwMsg("两次新密码不一致"); return; }
+    setPwBusy(true);
+    try {
+      const ok = await Da.changePassword(pwOld, pwNew);
+      if (ok) {
+        setPwMsg("密码已修改，云端同步后其他设备可用新密码登录");
+        setPwOk(true);
+        setPwOld(""); setPwNew(""); setPwNew2("");
+      } else {
+        setPwMsg("当前密码错误");
+      }
+    } catch (e) {
+      setPwMsg("修改失败：" + (e.message || e));
+    }
+    setPwBusy(false);
+  };
   const fileRef = useRef(null);
   useEffect(() => { const t = setTimeout(() => setShow(true), 10); return () => clearTimeout(t); }, []);
   const close = () => { setShow(false); setTimeout(onClose, 300); };
@@ -3742,7 +3859,9 @@ function SettingsDrawer({ settings, onSave, onClose, onReset, onExport, onExport
           </div>
           <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
           <div className="field">
-            <label className="field-label">AI 助手 · 服务商</label>
+            <label className="field-label">AI 助手 · 服务商 {!isAdminUser && <span style={{fontSize:11,color:"var(--ink-3)",fontWeight:400}}>（仅管理员）</span>}</label>
+            {isAdminUser ? (
+              <React.Fragment>
             <div style={{ background: "var(--bg-soft)", borderRadius: "var(--r-md)", padding: "10px 13px", marginBottom: 12, display: "flex", alignItems: "center", gap: 9 }}>
               <span style={{ width: 8, height: 8, borderRadius: 99, background: (prov === "auto" && inClaude) || d.apiKey ? "oklch(0.7 0.16 150)" : "var(--ink-3)", flexShrink: 0 }} />
               <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
@@ -3777,7 +3896,14 @@ function SettingsDrawer({ settings, onSave, onClose, onReset, onExport, onExport
             )}
             <button className="btn btn-accent" onClick={save} style={{ width: "100%", justifyContent: "center", marginTop: 12 }}>
               <Icon name="check" size={15} stroke={2.6} /> 保存 AI 设置
-            </button>
+                          </React.Fragment>
+            ) : (
+              <div style={{ background: "var(--bg-soft)", borderRadius: "var(--r-md)", padding: "16px", textAlign: "center" }}>
+                <p style={{ fontSize: 13, color: "var(--ink-2)", margin: 0 }}>
+                  AI 助手功能仅限管理员账号使用。<br/>如需使用，请联系管理员。
+                </p>
+              </div>
+            )}</button>
           </div>
           <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
           <div className="field">
@@ -3791,36 +3917,44 @@ function SettingsDrawer({ settings, onSave, onClose, onReset, onExport, onExport
           </div>
           <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
           <div className="field">
-            <label className="field-label">云同步（多设备自动同步）</label>
-            {cloudEnabled ? (
-              <React.Fragment>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, marginBottom: 10, color: syncStatus === "error" ? "oklch(0.62 0.2 25)" : "oklch(0.55 0.13 150)" }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 99, background: syncStatus === "error" ? "oklch(0.62 0.2 25)" : syncStatus === "syncing" ? "var(--accent)" : "oklch(0.7 0.16 150)" }} />
-                  {syncStatus === "error" ? "同步出错，请检查网络 / Token" : syncStatus === "syncing" ? "正在同步…" : "已开启 · 数据自动同步"}
-                </div>
-                <p style={{ fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.6, margin: "0 0 12px" }}>
-                  在另一台设备的设置里，用<b>同一个 GitHub Token</b> 点连接，即可拉取相同数据；之后两边改动都会自动同步。
-                </p>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button className="btn btn-soft" onClick={onSyncNow} style={{ flex: 1, justifyContent: "center" }}><Icon name="download" size={16} /> 立即同步</button>
-                  <button className="btn btn-ghost" style={{ color: "oklch(0.6 0.18 25)", flex: 1, justifyContent: "center" }} onClick={onDisconnectCloud}>断开</button>
-                </div>
-              </React.Fragment>
+            <label className="field-label">云同步（多设备自动同步）{!isAdminUser && <span style={{fontSize:11,color:"var(--ink-3)",fontWeight:400}}>（仅管理员）</span>}</label>
+            {isAdminUser ? (
+              cloudEnabled ? (
+                <React.Fragment>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, marginBottom: 10, color: syncStatus === "error" ? "oklch(0.62 0.2 25)" : "oklch(0.55 0.13 150)" }}>
+                    <span style={{ width: 8, height: 8, borderRadius: 99, background: syncStatus === "error" ? "oklch(0.62 0.2 25)" : syncStatus === "syncing" ? "var(--accent)" : "oklch(0.7 0.16 150)" }} />
+                    {syncStatus === "error" ? "同步出错，请检查网络 / Token" : syncStatus === "syncing" ? "正在同步…" : "已开启 · 数据自动同步"}
+                  </div>
+                  <p style={{ fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.6, margin: "0 0 12px" }}>
+                    在另一台设备的设置里，用<b>同一个 GitHub Token</b> 点连接，即可拉取相同数据；之后两边改动都会自动同步。
+                  </p>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button className="btn btn-soft" onClick={onSyncNow} style={{ flex: 1, justifyContent: "center" }}><Icon name="download" size={16} /> 立即同步</button>
+                    <button className="btn btn-ghost" style={{ color: "oklch(0.6 0.18 25)", flex: 1, justifyContent: "center" }} onClick={onDisconnectCloud}>断开</button>
+                  </div>
+                </React.Fragment>
+              ) : (
+                <React.Fragment>
+                  <p style={{ fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.6, margin: "0 0 10px" }}>
+                    用你的 <b>GitHub</b> 账号实现真正的云同步：数据存在你自己的一个私密 Gist 里，手机 / 电脑 / Mac App 自动保持一致。
+                  </p>
+                  <input className="input" type="password" value={tokenInput} placeholder="粘贴 GitHub Token（ghp_...）" autoComplete="off"
+                    onChange={(e) => setTokenInput(e.target.value.trim())} style={{ marginBottom: 8 }} />
+                  <button className="btn btn-accent" onClick={() => onConnectCloud(tokenInput)} style={{ width: "100%", justifyContent: "center" }}
+                    disabled={syncStatus === "syncing"}>
+                    {syncStatus === "syncing" ? "连接中…" : "连接 GitHub，开启云同步"}
+                  </button>
+                  <p style={{ fontSize: 11.5, color: "var(--ink-3)", lineHeight: 1.7, margin: "10px 0 0" }}>
+                    获取 Token：GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate，勾选 <b>gist</b> 权限即可。Token 仅存本机，不会被同步到云端。
+                  </p>
+                </React.Fragment>
+              )
             ) : (
-              <React.Fragment>
-                <p style={{ fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.6, margin: "0 0 10px" }}>
-                  用你的 <b>GitHub</b> 账号实现真正的云同步：数据存在你自己的一个私密 Gist 里，手机 / 电脑 / Mac App 自动保持一致。
+              <div style={{ background: "var(--bg-soft)", borderRadius: "var(--r-md)", padding: "16px", textAlign: "center" }}>
+                <p style={{ fontSize: 13, color: "var(--ink-2)", margin: 0 }}>
+                  云同步功能仅限管理员账号使用。<br/>如需开启，请联系管理员。
                 </p>
-                <input className="input" type="password" value={tokenInput} placeholder="粘贴 GitHub Token（ghp_...）" autoComplete="off"
-                  onChange={(e) => setTokenInput(e.target.value.trim())} style={{ marginBottom: 8 }} />
-                <button className="btn btn-accent" onClick={() => onConnectCloud(tokenInput)} style={{ width: "100%", justifyContent: "center" }}
-                  disabled={syncStatus === "syncing"}>
-                  {syncStatus === "syncing" ? "连接中…" : "连接 GitHub，开启云同步"}
-                </button>
-                <p style={{ fontSize: 11.5, color: "var(--ink-3)", lineHeight: 1.7, margin: "10px 0 0" }}>
-                  获取 Token：GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate，勾选 <b>gist</b> 权限即可。Token 仅存本机，不会被同步到云端。
-                </p>
-              </React.Fragment>
+              </div>
             )}
           </div>
           <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
@@ -3841,6 +3975,27 @@ function SettingsDrawer({ settings, onSave, onClose, onReset, onExport, onExport
               onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) onImportBackup(f); e.target.value = ""; }} />
           </div>
           <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
+          <div className="field">
+            <label className="field-label">修改密码</label>
+            <p style={{ fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.6, margin: "0 0 10px" }}>
+              修改后新密码会自动同步到云端，其他设备用新密码登录。
+            </p>
+            {pwMsg && <div style={{ fontSize: 12, color: pwOk ? "oklch(0.55 0.13 150)" : "oklch(0.6 0.18 25)", marginBottom: 8, fontWeight: 600 }}>{pwMsg}</div>}
+            <input className="input" type="password" value={pwOld} placeholder="当前密码" autoComplete="off"
+              onChange={(e) => { setPwOld(e.target.value); setPwMsg(""); }}
+              style={{ marginBottom: 6 }} />
+            <input className="input" type="password" value={pwNew} placeholder="新密码（至少6位）" autoComplete="off"
+              onChange={(e) => { setPwNew(e.target.value); setPwMsg(""); }}
+              style={{ marginBottom: 6 }} />
+            <input className="input" type="password" value={pwNew2} placeholder="确认新密码" autoComplete="off"
+              onChange={(e) => { setPwNew2(e.target.value); setPwMsg(""); }}
+              onKeyDown={(e) => { if (e.key === "Enter") doChangePw(); }}
+              style={{ marginBottom: 8 }} />
+            <button className="btn btn-accent" onClick={doChangePw} disabled={pwBusy} style={{ width: "100%", justifyContent: "center" }}>
+              <Icon name="check" size={15} stroke={2.6} /> {pwBusy ? "修改中…" : "修改密码"}
+            </button>
+          </div>
+          <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
           <button className="btn btn-ghost" style={{ color: "oklch(0.6 0.18 25)", width: "100%", justifyContent: "center" }}
             onClick={() => { if (confirm("将清空所有数据并恢复示例，确定？")) { onReset(); close(); } }}>
             <Icon name="trash" size={15} /> 重置全部数据
@@ -3855,16 +4010,35 @@ function SettingsDrawer({ settings, onSave, onClose, onReset, onExport, onExport
 function LoginScreen({ onLogin }) {
   const [user, setUser] = useState("");
   const [pass, setPass] = useState("");
-  const [error, setError] = useState(false);
+  const [pass2, setPass2] = useState("");
+  const [error, setError] = useState("");
+  const [mode, setMode] = useState("login"); // "login" | "register"
+  const [busy, setBusy] = useState(false);
 
   const handleLogin = async () => {
-    const ok = await Da.doLogin(user, pass);
-    if (ok) {
-      onLogin();
-    } else {
-      setError(true);
-    }
+    setBusy(true); setError("");
+    try {
+      const ok = await Da.doLogin(user, pass);
+      if (ok) { onLogin(); } else { setError("账号或密码错误，请重试"); }
+    } catch(e) { setError("登录失败：" + (e.message || e)); }
+    setBusy(false);
   };
+
+  const handleRegister = async () => {
+    setError("");
+    if (!user.trim()) { setError("请输入账号"); return; }
+    if (pass.length < 6) { setError("密码至少6位"); return; }
+    if (pass !== pass2) { setError("两次密码不一致"); return; }
+    setBusy(true);
+    try {
+      const result = await Da.doRegister(user.trim(), pass);
+      if (result === true) { onLogin(); }
+      else { setError(result); }
+    } catch(e) { setError("注册失败：" + (e.message || e)); }
+    setBusy(false);
+  };
+
+  const switchMode = (m) => { setMode(m); setError(""); setUser(""); setPass(""); setPass2(""); };
 
   return (
     <div className="login-overlay">
@@ -3872,14 +4046,33 @@ function LoginScreen({ onLogin }) {
         <div className="login-avatar" />
         <div className="login-title">备考日历</div>
         <div className="login-sub">规划每一天 · 看见每一分</div>
-        <input className="input" type="text" value={user} placeholder="账号"
-          onChange={(e) => { setUser(e.target.value); setError(false); }}
+        <input className="input" type="text" value={user} placeholder="账号" autoComplete="username"
+          onChange={(e) => { setUser(e.target.value); setError(""); }}
           onKeyDown={(e) => { if (e.key === "Enter") document.getElementById("login-pass").focus(); }} />
-        <input id="login-pass" className="input" type="password" value={pass} placeholder="密码"
-          onChange={(e) => { setPass(e.target.value); setError(false); }}
-          onKeyDown={(e) => { if (e.key === "Enter") handleLogin(); }} />
-        <div className={"login-error" + (error ? " show" : "")}>账号或密码错误，请重试</div>
-        <button className="login-btn" onClick={handleLogin}>登 录</button>
+        <input id="login-pass" className="input" type="password" value={pass} placeholder="密码" autoComplete="current-password"
+          onChange={(e) => { setPass(e.target.value); setError(""); }}
+          onKeyDown={(e) => { if (e.key === "Enter") { if (mode === "register") { document.getElementById("login-pass2").focus(); } else { handleLogin(); } } }} />
+        {mode === "register" && (
+          <input id="login-pass2" className="input" type="password" value={pass2} placeholder="确认密码" autoComplete="new-password"
+            onChange={(e) => { setPass2(e.target.value); setError(""); }}
+            onKeyDown={(e) => { if (e.key === "Enter") handleRegister(); }} />
+        )}
+        <div className={"login-error" + (error ? " show" : "")}>{error}</div>
+        {mode === "login" ? (
+          <React.Fragment>
+            <button type="button" className="login-btn" onClick={handleLogin} disabled={busy}>
+              {busy ? "验证中…" : "登 录"}
+            </button>
+            <span className="login-toggle" onClick={() => switchMode("register")}>还没有账号？注册一个新账号</span>
+          </React.Fragment>
+        ) : (
+          <React.Fragment>
+            <button type="button" className="login-btn" onClick={handleRegister} disabled={busy}>
+              {busy ? "注册中…" : "注 册"}
+            </button>
+            <span className="login-toggle" onClick={() => switchMode("login")}>已有账号？返回登录</span>
+          </React.Fragment>
+        )}
       </div>
     </div>
   );
@@ -3888,7 +4081,14 @@ function LoginScreen({ onLogin }) {
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(() => Da.isLoggedIn());
-  const [state, setState] = useState(() => Da.load());
+  const [state, setState] = useState(() => {
+    const s = Da.load();
+    // 如果 state 中有云端同步来的密码哈希，更新本地
+    if (s.settings && s.settings.passwordHash) {
+      Da.setPasswordHash(s.settings.passwordHash);
+    }
+    return s;
+  });
   const [view, setView] = useState("month"); // month | week | day
   const [anchor, setAnchor] = useState(Da.today());
   const [editing, setEditing] = useState(null); // event being edited
@@ -3907,21 +4107,60 @@ function App() {
 
   const handleLogout = () => { Da.doLogout(); setLoggedIn(false); };
 
-  // 登录后自动启用云同步（如果还没启用）
+  // 登录后：Admin 自动注入 API Key + 云同步 Token，普通用户仅自动连接云端（如有）
   const autoSyncRef = useRef(false);
   useEffect(() => {
     if (!loggedIn || autoSyncRef.current) return;
     autoSyncRef.current = true;
+    const isAdminUser = Da.isAdmin();
     const st = stateRef.current;
+
+    // —— Admin：自动注入预置的 API Key 和同步 Token（尚未手动配置时） ——
+    if (isAdminUser) {
+      let needsUpdate = false;
+      const nextSettings = { ...st.settings };
+      if (!nextSettings.apiKey && Da.ADMIN_API_KEY) {
+        nextSettings.apiKey = Da.ADMIN_API_KEY;
+        nextSettings.aiProvider = "openai";
+        needsUpdate = true;
+      }
+      if (!nextSettings.syncToken && Da.SYNC_TOKEN) {
+        nextSettings.syncToken = Da.SYNC_TOKEN;
+        needsUpdate = true;
+      }
+      if (needsUpdate) {
+        const updated = { ...st, settings: nextSettings };
+        setState(updated);
+        Da.save(updated);
+        // 注入后立即尝试连接云端
+        if (Da.SYNC_TOKEN && !st.settings.syncGistId) {
+          setTimeout(() => connectCloud(Da.SYNC_TOKEN), 500);
+          return;
+        }
+        if (updated.settings.syncEnabled && updated.settings.syncToken && updated.settings.syncGistId) {
+          setTimeout(() => pullCloud(), 500);
+          return;
+        }
+        return;
+      }
+    }
+
     // 如果已经开启了云同步，拉取一下云端最新数据
     if (st.settings.syncEnabled && st.settings.syncToken && st.settings.syncGistId) {
       pullCloud();
       return;
     }
+    // Admin 已配置 syncToken 但未连接，自动连接
+    if (isAdminUser && st.settings.syncToken && !st.settings.syncGistId) {
+      connectCloud(st.settings.syncToken);
+      return;
+    }
     // 否则尝试用内置 Token 自动连接
     const token = Da.SYNC_TOKEN;
     if (!token || token.includes("PLACEHOLDER")) return;
-    connectCloud(token);
+    if (isAdminUser) {
+      connectCloud(token);
+    }
   }, [loggedIn]);
   const cloudEnabled = !!(state.settings.syncEnabled && state.settings.syncToken && state.settings.syncGistId);
 
@@ -3963,6 +4202,10 @@ function App() {
         const localT = st.updatedAt || 0, cloudT = cloud.updatedAt || 0;
         if (cloudT > localT) {
           const merged = Da.mergeCloud(st, cloud);
+          // 同步密码哈希到本机 localStorage
+          if (merged.settings && merged.settings.passwordHash) {
+            Da.setPasswordHash(merged.settings.passwordHash);
+          }
           const p = Da.cloudPayload(merged); delete p.updatedAt;
           syncRef.current.lastJson = JSON.stringify(p);
           syncRef.current.pulling = true;
@@ -4195,7 +4438,7 @@ function App() {
       {reviewSubject && <SubjectReviewModal subjectId={reviewSubject} state={state} setState={setState} onClose={() => setReviewSubject(null)} />}
       {showSettings && (
         <SettingsDrawer settings={state.settings}
-          onSave={(set) => setState((s) => ({ ...s, settings: { ...set, syncToken: s.settings.syncToken, syncGistId: s.settings.syncGistId, syncEnabled: s.settings.syncEnabled } }))}
+          onSave={(set) => setState((s) => { const passHash = Da.getPasswordHash(); return { ...s, settings: { ...set, syncToken: s.settings.syncToken, syncGistId: s.settings.syncGistId, syncEnabled: s.settings.syncEnabled, passwordHash: passHash !== Da.DEFAULT_PASSHASH ? passHash : s.settings.passwordHash || "" } }; })}
           onReset={() => { Da.reset(); setState(Da.defaultState()); }}
           onExport={doExport}
           onExportBackup={doExportBackup}
