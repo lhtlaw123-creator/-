@@ -1394,30 +1394,69 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
   function gistHeaders(token) {
     return { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json", "Content-Type": "application/json" };
   }
-  // 同步到云端的数据：剔除本机秘密（token / API key）
+  // 多用户共享云同步：收集所有用户数据上传
   function cloudPayload(state) {
-    const s = JSON.parse(JSON.stringify(state));
+    var username = (getLoggedInUser() || {}).username || "guest";
+    var allUsers = {};
+    // 先尝试从云端缓存读取
+    try {
+      var raw = localStorage.getItem("_beikao-cloud-cache");
+      if (raw) allUsers = JSON.parse(raw);
+    } catch(e) {}
+    // 也从各用户 localStorage 读取最新数据
+    try {
+      var users = getUsers();
+      users.forEach(function(u) {
+        var uk = KEY + "-" + u.username;
+        var raw2 = localStorage.getItem(uk);
+        if (raw2 && !allUsers[u.username]) {
+          try {
+            var d = JSON.parse(raw2);
+            if (d.settings) {
+              delete d.settings.syncToken;
+              delete d.settings.syncGistId;
+              delete d.settings.syncEnabled;
+            }
+            allUsers[u.username] = d;
+          } catch(e2) {}
+        }
+      });
+    } catch(e3) {}
+    // 更新当前用户
+    var s = JSON.parse(JSON.stringify(state));
     if (s.settings) {
-      // 仅剔除本机专属的同步凭据，AI 设置和其余配置一并同步
       delete s.settings.syncToken;
       delete s.settings.syncGistId;
       delete s.settings.syncEnabled;
     }
-    return s;
+    allUsers[username] = s;
+    return { _multi: true, users: allUsers };
   }
-  // 采用云端数据时，保留本机秘密设置
+  // 从多用户云端提取当前用户数据
   function mergeCloud(local, cloud) {
-    const m = JSON.parse(JSON.stringify(cloud));
-    // 同步凭据每设备独立；AI 设置云端优先（除非本地已有配置）
-    m.settings = Object.assign({}, cloud.settings, {
+    var username = (getLoggedInUser() || {}).username || "guest";
+    var isAdmin = !!(getLoggedInUser() || {}).role === "admin";
+
+    // 多用户格式：提取当前用户
+    var userData = cloud;
+    if (cloud._multi && cloud.users) {
+      // 缓存所有用户数据供管理员查看
+      try { localStorage.setItem("_beikao-cloud-cache", JSON.stringify(cloud.users)); } catch(e) {}
+      userData = cloud.users[username] || cloud;
+    }
+
+    var m = JSON.parse(JSON.stringify(userData || cloud));
+    if (!m.settings) m.settings = {};
+
+    // 保留本机秘密设置
+    m.settings = Object.assign({}, m.settings, {
       syncToken: local.settings.syncToken,
       syncGistId: local.settings.syncGistId,
       syncEnabled: local.settings.syncEnabled,
-      // 如果云端有 AI 配置且本地为空，用云端的；否则保留本地
-      apiKey: local.settings.apiKey || cloud.settings.apiKey || "",
-      aiProvider: local.settings.aiProvider || cloud.settings.aiProvider || "auto",
-      aiBaseUrl: local.settings.aiBaseUrl || cloud.settings.aiBaseUrl || "",
-      aiModel: local.settings.aiModel || cloud.settings.aiModel || "",
+      apiKey: local.settings.apiKey || (m.settings.apiKey || ""),
+      aiProvider: local.settings.aiProvider || (m.settings.aiProvider || "auto"),
+      aiBaseUrl: local.settings.aiBaseUrl || (m.settings.aiBaseUrl || ""),
+      aiModel: local.settings.aiModel || (m.settings.aiModel || ""),
     });
     return m;
   }
@@ -2234,15 +2273,42 @@ function MemoBox({ memos, onChange }) {
 }
 
 /* ---------- 侧边栏 ---------- */
-function Sidebar({ collapsed, state, setState, anchor, onManageCountdown, onReviewSubject, toggleSubject }) {
+function Sidebar({ collapsed, state, setState, anchor, onManageCountdown, onReviewSubject, toggleSubject, viewAsUser, onViewAsUser }) {
   const { subjects, events, settings } = state;
   const weekFrom = Db.startOfWeek(anchor), weekTo = Db.addDays(weekFrom, 6);
   const { map } = useMemo(() => Db.rangeStats(events, subjects, weekFrom, weekTo), [events, subjects, weekFrom]);
   const hidden = settings.hiddenSubjects || [];
   const groups = Db.GROUP_ORDER.map((g) => [g, subjects.filter((s) => s.group === g)]);
+  const isAdmin = Db.isAdmin();
+  const allUsers = useMemo(() => { try { return Db.getUsers(); } catch(e) { return []; } }, []);
 
   return (
     <div className={"sidebar" + (collapsed ? " collapsed" : "")}>
+      {/* 管理员：用户切换 */}
+      {isAdmin && (
+        <div style={{ marginBottom: 14 }}>
+          <div className="side-title">用户管理</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <div className={"subj-item" + (!viewAsUser ? "" : " off")} onClick={() => onViewAsUser(null)}
+              style={{ fontWeight: !viewAsUser ? 700 : 400 }}>
+              <span className="subj-dot" style={{ background: "var(--accent)" }} />
+              <span className="subj-name">{Db.getLoggedInUser()?.username || "admin"}（我）</span>
+            </div>
+            {allUsers.filter(function(u) { return u.username !== (Db.getLoggedInUser() || {}).username; }).map(function(u) {
+              return (
+                <div key={u.username} className={"subj-item" + (viewAsUser === u.username ? "" : " off")}
+                  onClick={() => onViewAsUser(u.username)}
+                  style={{ fontWeight: viewAsUser === u.username ? 700 : 400 }}>
+                  <span className="subj-dot" style={{ background: u.role === "admin" ? "var(--ink)" : "var(--ink-3)" }} />
+                  <span className="subj-name">{u.username}{u.role === "admin" ? " 👑" : ""}</span>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ height: 1, background: "var(--line)", margin: "10px 0" }} />
+        </div>
+      )}
+
       <CountdownCard countdowns={state.countdowns} active={settings.activeCountdown}
         setActive={(i) => setState((s) => ({ ...s, settings: { ...s.settings, activeCountdown: i } }))}
         onManage={onManageCountdown} />
@@ -3525,6 +3591,37 @@ function ReportModal({ state, setState, onClose, anchor, toast, onOpenAI }) {
 
   const runAnalysis = async () => {
     setStep("loading");
+    var steps = [
+      { text: "收集" + gathered.label + "学习数据", status: "done" },
+      { text: "分析整体学习状态与节奏", status: "active" },
+      { text: "逐科深度分析（共" + rows.length + "科）", status: "pending" },
+      { text: "诊断薄弱环节与风险", status: "pending" },
+      { text: "生成改进建议与下阶段计划", status: "pending" },
+      { text: "整理报告", status: "pending" },
+    ];
+    setProgress({ steps: steps, current: 0, thinking: "正在分析 " + gathered.label + " 的学习数据…" });
+    var timer = setInterval(function() {
+      setProgress(function(p) {
+        if (!p || !p.steps) return p;
+        var next = p.current + 1;
+        if (next >= p.steps.length) { clearInterval(timer); return p; }
+        var newSteps = p.steps.map(function(s, i) {
+          if (i < next) return { text: s.text, status: "done" };
+          if (i === next) return { text: s.text, status: "active" };
+          return s;
+        });
+        var thinkings = [
+          "正在分析 " + gathered.label + " 的学习数据…",
+          "正在评估学习节奏与投入产出比…",
+          rows.length > 0 ? "正在分析「" + rows[Math.min(next-2, rows.length-1)].name + "」…" : "正在逐科分析…",
+          "正在识别薄弱环节…",
+          "正在制定改进方案…",
+          "正在整理最终报告…",
+        ];
+        return { steps: newSteps, current: next, thinking: thinkings[Math.min(next, thinkings.length-1)] || "处理中…" };
+      });
+    }, 800);
+
     let result = null, note = "";
     if (Dr.aiAvailable(state)) {
       try {
@@ -3535,18 +3632,52 @@ function ReportModal({ state, setState, onClose, anchor, toast, onOpenAI }) {
     } else {
       note = "未接入 AI（设置里填 API Key 即可启用），当前为本地智能分析。";
     }
+    clearInterval(timer);
     if (!result) result = localAnalyze(rows, gathered.map, gathered.days, gathered.label);
-    setAnalysis(result); setAiNote(note); setStep("report");
+    // 标记全部完成
+    setProgress({ steps: steps.map(function(s) { return { text: s.text, status: "done" }; }), current: steps.length, thinking: "✓ 报告生成完成" });
+    setTimeout(function() { setAnalysis(result); setAiNote(note); setStep("report"); }, 400);
   };
 
   const [exporting, setExporting] = useState(false);
   const [exportErr, setExportErr] = useState("");
+  const [progress, setProgress] = useState({ steps: [], current: -1, thinking: "" });
 
   const exportWord = async () => {
     if (!analysis || exporting) return;
     setExporting(true); setExportErr("");
+    var expSteps = [
+      { text: "生成报告框架", status: "done" },
+      { text: "评估整体学习情况", status: "active" },
+      { text: "逐科撰写正式分析（共" + rows.length + "科）", status: "pending" },
+      { text: "梳理亮点与不足", status: "pending" },
+      { text: "制定改进措施与建议", status: "pending" },
+      { text: "排版导出 Word 文档", status: "pending" },
+    ];
+    setProgress({ steps: expSteps, current: 0, thinking: "正在生成 Word 报告…" });
+    var timer2 = setInterval(function() {
+      setProgress(function(p) {
+        if (!p || !p.steps) return p;
+        var nx = p.current + 1;
+        if (nx >= p.steps.length) { clearInterval(timer2); return p; }
+        var ns = p.steps.map(function(s, i) {
+          if (i < nx) return { text: s.text, status: "done" };
+          if (i === nx) return { text: s.text, status: "active" };
+          return s;
+        });
+        var th = [
+          "正在生成 Word 报告…",
+          "正在评估整体学习情况…",
+          rows.length > 0 ? "正在撰写「" + rows[Math.min(nx-2, rows.length-1)].name + "」的正式分析…" : "正在逐科分析…",
+          "正在梳理亮点与不足…",
+          "正在制定改进措施…",
+          "正在排版导出…",
+        ];
+        return { steps: ns, current: nx, thinking: th[Math.min(nx, th.length-1)] || "处理中…" };
+      });
+    }, 700);
+
     let deepAnalysis = null;
-    // 触发 AI 深度分析（使用同一模型）
     if (Dr.aiAvailable(state)) {
       try {
         const deepRaw = await Dr.aiComplete(buildDeepReportPrompt(rows, gathered.map, gathered.days, gathered.label, gathered.from, gathered.to), state.settings, "analysis");
@@ -3556,9 +3687,12 @@ function ReportModal({ state, setState, onClose, anchor, toast, onOpenAI }) {
         setExportErr("AI 深度分析失败，使用基础报告导出。");
       }
     }
+    clearInterval(timer2);
     if (!deepAnalysis) deepAnalysis = analysis;
+    // 标记完成
+    setProgress({ steps: expSteps.map(function(s) { return { text: s.text, status: "done" }; }), current: expSteps.length, thinking: "✓ 正在生成文件…" });
+
     const wordHTML = generateWordHTML(deepAnalysis, rows, state, gathered, totDone, totTarget, activeDays);
-    // 以 Word 格式下载
     const blob = new Blob(['﻿' + wordHTML], { type: 'application/msword;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -3612,17 +3746,58 @@ function ReportModal({ state, setState, onClose, anchor, toast, onOpenAI }) {
           )}
 
           {step === "loading" && (
-            <div style={{ textAlign: "center", padding: "60px 0" }}>
-              <div className="ai-typing" style={{ justifyContent: "center", marginBottom: 16 }}><i /><i /><i /></div>
-              <div style={{ color: "var(--ink-2)", fontSize: 14 }}>AI 正在逐项分析你的{gathered.label}学习数据…</div>
+            <div style={{ padding: "30px 20px" }}>
+              <div style={{ textAlign: "center", marginBottom: 28 }}>
+                <div className="ai-typing" style={{ justifyContent: "center", marginBottom: 12 }}><i /><i /><i /></div>
+                <div style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "var(--ink)", marginBottom: 4 }}>
+                  AI 正在生成{gathered.label}分析报告
+                </div>
+                <div style={{ fontSize: 13, color: "var(--accent-ink)", fontWeight: 600 }}>
+                  {progress.thinking || "准备中…"}
+                </div>
+              </div>
+              <div style={{ maxWidth: 420, margin: "0 auto" }}>
+                {(progress.steps || []).map(function(s, i) {
+                  var icon = s.status === "done" ? "✓" : s.status === "active" ? "●" : "○";
+                  var color = s.status === "done" ? "oklch(0.65 0.14 150)" : s.status === "active" ? "var(--accent-ink)" : "var(--ink-3)";
+                  var weight = s.status === "active" ? 700 : 400;
+                  return (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", opacity: s.status === "pending" ? 0.45 : 1, transition: "all 0.3s" }}>
+                      <span style={{ fontSize: 14, color: color, fontWeight: 700, width: 20, textAlign: "center", flexShrink: 0 }}>{icon}</span>
+                      <span style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: weight }}>{s.text}</span>
+                      {s.status === "active" && <span className="ai-typing" style={{ display: "inline-flex", gap: 3, marginLeft: 4 }}><i style={{ width: 4, height: 4 }} /><i style={{ width: 4, height: 4 }} /><i style={{ width: 4, height: 4 }} /></span>}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
           {exporting && (
-            <div className="rep-exporting">
-              <div className="ai-typing" style={{ justifyContent: "center", marginBottom: 16 }}><i /><i /><i /></div>
-              <p>AI 正在逐科撰写正式分析报告…</p>
-              <p style={{ fontSize: 12, color: "var(--ink-3)" }}>报告将导出为 Word 文档（.doc），采用国标公文格式</p>
+            <div style={{ padding: "30px 20px" }}>
+              <div style={{ textAlign: "center", marginBottom: 28 }}>
+                <div className="ai-typing" style={{ justifyContent: "center", marginBottom: 12 }}><i /><i /><i /></div>
+                <div style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "var(--ink)", marginBottom: 4 }}>
+                  正在生成 Word 报告
+                </div>
+                <div style={{ fontSize: 13, color: "var(--accent-ink)", fontWeight: 600 }}>
+                  {progress.thinking || "准备中…"}
+                </div>
+              </div>
+              <div style={{ maxWidth: 420, margin: "0 auto" }}>
+                {(progress.steps || []).map(function(s, i) {
+                  var icon = s.status === "done" ? "✓" : s.status === "active" ? "●" : "○";
+                  var color = s.status === "done" ? "oklch(0.65 0.14 150)" : s.status === "active" ? "var(--accent-ink)" : "var(--ink-3)";
+                  var weight = s.status === "active" ? 700 : 400;
+                  return (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", opacity: s.status === "pending" ? 0.45 : 1, transition: "all 0.3s" }}>
+                      <span style={{ fontSize: 14, color: color, fontWeight: 700, width: 20, textAlign: "center", flexShrink: 0 }}>{icon}</span>
+                      <span style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: weight }}>{s.text}</span>
+                      {s.status === "active" && <span className="ai-typing" style={{ display: "inline-flex", gap: 3, marginLeft: 4 }}><i style={{ width: 4, height: 4 }} /><i style={{ width: 4, height: 4 }} /><i style={{ width: 4, height: 4 }} /></span>}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -4166,6 +4341,7 @@ function App() {
   const [showReport, setShowReport] = useState(false);
   const [showCountdownMgr, setShowCountdownMgr] = useState(false);
   const [reviewSubject, setReviewSubject] = useState(null);
+  const [viewAsUser, setViewAsUser] = useState(null); // 管理员查看其他用户
   const [collapsed, setCollapsed] = useState(false);
   const [toast, toastNode] = useToast();
   const [syncStatus, setSyncStatus] = useState("idle"); // idle | syncing | ok | error
@@ -4225,7 +4401,15 @@ function App() {
   }, [loggedIn]);
   const cloudEnabled = !!(state.settings.syncEnabled && state.settings.syncToken && state.settings.syncGistId);
 
-  useEffect(() => { Da.save(state); window.CalData._aiSettings = state.settings; }, [state]);
+  useEffect(() => {
+    if (viewAsUser) {
+      // 管理员查看其他用户：保存到对应用户的 key
+      try { localStorage.setItem(Da.KEY + "-" + viewAsUser, JSON.stringify(state)); } catch(e) {}
+    } else {
+      Da.save(state);
+    }
+    window.CalData._aiSettings = state.settings;
+  }, [state]);
 
   // 云同步：内容变化后（防抖）推送到云端
   const contentKey = (st) => { const p = Da.cloudPayload(st); delete p.updatedAt; return JSON.stringify(p); };
@@ -4457,7 +4641,7 @@ function App() {
       </div>
 
       <div className="main">
-        <Sidebar collapsed={collapsed} state={state} setState={setState} anchor={anchor}
+        <Sidebar collapsed={collapsed} state={state} setState={setState} anchor={anchor} viewAsUser={viewAsUser} onViewAsUser={(u) => { if (u) { var raw = localStorage.getItem(Da.KEY + "-" + u); if (raw) { try { var d = JSON.parse(raw); d.settings = Object.assign({}, state.settings, d.settings || {}); setState(d); setViewAsUser(u); } catch(e) { toast("加载失败"); } } else { toast("该用户暂无本地数据，请先同步云端"); } } else { setViewAsUser(null); var s = Da.load(); setState(s); stateRef.current = s; } }}
           onManageCountdown={() => setShowCountdownMgr(true)}
           onReviewSubject={(id) => setReviewSubject(id)}
           toggleSubject={toggleSubject} />
