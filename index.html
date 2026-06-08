@@ -1,0 +1,3095 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="备考日历" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="theme-color" content="#fbf9f6" />
+  <title>备考日历</title>
+  <style>
+/* ============ 备考日历 · 设计系统 ============ */
+@import url("https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css");
+
+:root {
+  /* 字体 */
+  --font-display: "LXGW WenKai", "STKaiti", "KaiTi", "PingFang SC", serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", system-ui, "Segoe UI", sans-serif;
+
+  /* 浅色多巴胺 · 中性基底（暖白） */
+  --bg: #fbf9f6;
+  --bg-soft: #f4f1ec;
+  --surface: #ffffff;
+  --surface-2: #fcfbf9;
+  --ink: #2c2a27;
+  --ink-2: #6b6760;
+  --ink-3: #a39e95;
+  --line: #ece8e1;
+  --line-2: #f3f0ea;
+
+  /* 强调（主色：温暖的桃橘，多巴胺味）*/
+  --accent: oklch(0.74 0.13 45);
+  --accent-soft: oklch(0.94 0.05 45);
+  --accent-ink: oklch(0.5 0.13 40);
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(60, 50, 40, 0.04), 0 2px 6px rgba(60, 50, 40, 0.05);
+  --shadow-md: 0 4px 14px rgba(60, 50, 40, 0.07), 0 10px 30px rgba(60, 50, 40, 0.06);
+  --shadow-lg: 0 12px 40px rgba(60, 50, 40, 0.13), 0 4px 12px rgba(60, 50, 40, 0.07);
+
+  /* 圆角 */
+  --r-sm: 9px;
+  --r-md: 14px;
+  --r-lg: 22px;
+  --r-xl: 30px;
+  --r-pill: 999px;
+
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+#root { height: 100vh; }
+
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input, textarea { font-family: inherit; }
+::selection { background: var(--accent-soft); }
+
+/* 滚动条 */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: #e3ded5; border-radius: 99px; border: 3px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: #d3cdc2; background-clip: content-box; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+.font-display { font-family: var(--font-display); }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* ---------- App 布局 ---------- */
+.app { display: flex; flex-direction: column; height: 100vh; }
+
+.topbar {
+  display: flex; align-items: center; gap: 9px;
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.78);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+  z-index: 30;
+}
+.brand { display: flex; align-items: center; gap: 11px; }
+.brand-mark {
+  width: 34px; height: 34px; border-radius: 11px; flex-shrink: 0;
+  background: conic-gradient(from 200deg, oklch(0.9 0.09 30), oklch(0.9 0.09 90), oklch(0.9 0.09 160), oklch(0.9 0.09 240), oklch(0.9 0.09 320), oklch(0.9 0.09 30));
+  display: grid; place-items: center;
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.6), var(--shadow-sm);
+}
+.brand-mark::after { content: ""; width: 13px; height: 13px; border-radius: 5px; background: var(--surface); }
+.brand-name { font-family: var(--font-display); font-size: 19px; font-weight: 700; letter-spacing: 0.5px; white-space: nowrap; }
+.brand-sub { font-size: 11.5px; color: var(--ink-3); margin-top: 1px; letter-spacing: 0.3px; }
+
+.spacer { flex: 1; }
+
+/* 分段控件 */
+.segment { display: inline-flex; background: var(--bg-soft); border-radius: var(--r-pill); padding: 3px; gap: 2px; }
+.segment button {
+  padding: 7px 17px; border-radius: var(--r-pill); font-size: 13.5px; font-weight: 600;
+  color: var(--ink-2); transition: all 0.22s var(--ease); position: relative;
+}
+.segment button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
+.segment button:not(.on):hover { color: var(--ink); }
+
+.nav-group { display: flex; align-items: center; gap: 6px; }
+.icon-btn {
+  width: 36px; height: 36px; border-radius: var(--r-md); display: grid; place-items: center;
+  color: var(--ink-2); transition: all 0.18s var(--ease); font-size: 17px;
+}
+.icon-btn:hover { background: var(--bg-soft); color: var(--ink); }
+.period-label { font-family: var(--font-display); font-size: 18px; font-weight: 700; min-width: 124px; text-align: center; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 15px; border-radius: var(--r-pill); font-size: 13.5px; font-weight: 600;
+  transition: all 0.18s var(--ease); white-space: nowrap;
+}
+.btn-ghost { color: var(--ink-2); }
+.btn-ghost:hover { background: var(--bg-soft); color: var(--ink); }
+.btn-soft { background: var(--bg-soft); color: var(--ink); }
+.btn-soft:hover { background: #ece7df; }
+.btn-accent { background: var(--ink); color: #fff; }
+.btn-accent:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.btn-today { background: var(--surface); border: 1px solid var(--line); color: var(--ink); box-shadow: var(--shadow-sm); }
+.btn-today:hover { background: var(--bg-soft); }
+.btn-ai { background: linear-gradient(135deg, oklch(0.78 0.13 35), oklch(0.74 0.13 350)); color: #fff; box-shadow: var(--shadow-sm); }
+.btn-ai:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+
+/* ---------- 主区 ---------- */
+.main { flex: 1; display: flex; min-height: 0; }
+.sidebar {
+  width: 248px; flex-shrink: 0; border-right: 1px solid var(--line);
+  background: var(--surface-2); overflow-y: auto; padding: 18px 16px 30px;
+  transition: width 0.3s var(--ease), opacity 0.3s var(--ease);
+}
+.sidebar.collapsed { width: 0; padding: 0; opacity: 0; overflow: hidden; }
+.calwrap { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+/* 倒计时卡 */
+.side-title { font-size: 11.5px; font-weight: 700; color: var(--ink-3); letter-spacing: 1px; text-transform: uppercase; margin: 22px 6px 10px; display: flex; align-items: center; justify-content: space-between; }
+
+/* 科目条目 */
+.subj-group-name { font-family: var(--font-display); font-size: 13px; color: var(--ink-2); margin: 14px 6px 6px; font-weight: 700; }
+.subj-item {
+  display: flex; align-items: center; gap: 10px; padding: 7px 9px; border-radius: var(--r-md);
+  cursor: pointer; transition: background 0.15s var(--ease); user-select: none;
+}
+.subj-item:hover { background: var(--bg-soft); }
+.subj-item.off { opacity: 0.4; }
+.subj-dot { width: 13px; height: 13px; border-radius: 5px; flex-shrink: 0; box-shadow: inset 0 0 0 1.5px rgba(0,0,0,0.05); }
+.subj-name { font-size: 13.5px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.subj-min { font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+/* ---------- 月视图 ---------- */
+.month { flex: 1; display: flex; flex-direction: column; padding: 12px 18px 16px; overflow: hidden; }
+.weekhead { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 8px; }
+.weekhead div { text-align: center; font-size: 12px; font-weight: 700; color: var(--ink-3); letter-spacing: 1px; padding: 2px 0; }
+.weekhead .we { color: oklch(0.7 0.1 25); }
+.monthgrid { flex: 1; display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; gap: 8px; min-height: 0; }
+.daycell {
+  background: var(--surface); border-radius: var(--r-md); padding: 8px; overflow: hidden;
+  display: flex; flex-direction: column; gap: 4px; cursor: pointer; position: relative;
+  border: 1.5px solid transparent; transition: all 0.16s var(--ease); min-height: 0;
+}
+.daycell:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.daycell.dim { background: var(--surface-2); }
+.daycell.dim .dc-num { color: var(--ink-3); }
+.daycell.today { border-color: var(--accent); }
+.dc-top { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+.dc-num { font-family: var(--font-display); font-size: 15px; font-weight: 700; line-height: 1; }
+.dc-num.todaynum { background: var(--ink); color: #fff; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; }
+.dc-min { font-size: 10.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; font-weight: 600; background: var(--bg-soft); padding: 1px 6px; border-radius: 99px; }
+.dc-events { display: flex; flex-direction: column; gap: 3px; overflow: hidden; flex: 1; min-height: 0; }
+.evpill {
+  font-size: 11px; padding: 2.5px 7px; border-radius: 7px; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; font-weight: 600; transition: all 0.14s var(--ease); flex-shrink: 0;
+  display: flex; align-items: center; gap: 5px;
+}
+.evpill:hover { transform: scale(1.015); filter: brightness(0.98); }
+.evpill.done { opacity: 0.55; }
+.evpill.done .evpill-t { text-decoration: line-through; }
+.evpill-t { overflow: hidden; text-overflow: ellipsis; }
+.evpill-check { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; border: 1.5px solid currentColor; opacity: 0.55; }
+.evpill.done .evpill-check { background: currentColor; }
+.dc-more { font-size: 10.5px; color: var(--ink-3); padding-left: 4px; font-weight: 600; }
+.dc-ring { position: absolute; right: 7px; bottom: 7px; }
+
+/* ---------- 周/日 时间轴 ---------- */
+.timeline-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 0 0 0 0; }
+.tl-head { display: grid; border-bottom: 1px solid var(--line); flex-shrink: 0; padding-right: 10px; }
+.tl-head-cell { padding: 9px 6px 11px; text-align: center; border-left: 1px solid var(--line-2); }
+.tl-head-cell:first-child { border-left: none; }
+.tl-dow { font-size: 11.5px; color: var(--ink-3); font-weight: 700; letter-spacing: 1px; }
+.tl-date { font-family: var(--font-display); font-size: 20px; font-weight: 700; margin-top: 3px; display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; }
+.tl-date.today { background: var(--ink); color: #fff; }
+.tl-head-cell .mini-ring { margin-top: 5px; }
+.tl-corner { width: 56px; flex-shrink: 0; }
+.tl-scroll { flex: 1; overflow-y: auto; position: relative; }
+.tl-grid { display: grid; position: relative; }
+.tl-hours { position: relative; }
+.tl-hour-label { height: 56px; position: relative; }
+.tl-hour-label span { position: absolute; top: -7px; right: 8px; font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tl-col { position: relative; border-left: 1px solid var(--line-2); }
+.tl-hour-line { height: 56px; border-top: 1px solid var(--line-2); box-sizing: border-box; }
+.tl-hour-line.half { border-top: 1px dashed var(--line-2); }
+.tl-event {
+  position: absolute; left: 3px; right: 3px; border-radius: 9px; padding: 5px 8px; overflow: hidden;
+  font-size: 11.5px; cursor: pointer; transition: all 0.14s var(--ease); box-shadow: var(--shadow-sm);
+  border-left: 3px solid;
+}
+.tl-event:hover { transform: scale(1.01); box-shadow: var(--shadow-md); z-index: 5; }
+.tl-event.done { opacity: 0.6; }
+.tl-event .te-title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-event .te-meta { font-size: 10.5px; opacity: 0.8; margin-top: 1px; font-variant-numeric: tabular-nums; }
+.tl-now { position: absolute; left: 0; right: 0; height: 0; border-top: 2px solid oklch(0.65 0.2 25); z-index: 6; pointer-events: none; }
+.tl-now::before { content: ""; position: absolute; left: -5px; top: -5px; width: 9px; height: 9px; border-radius: 50%; background: oklch(0.65 0.2 25); }
+
+/* ---------- 进度环 ---------- */
+.ring { position: relative; display: inline-grid; place-items: center; }
+.ring svg { transform: rotate(-90deg); display: block; }
+.ring-label { position: absolute; text-align: center; line-height: 1; }
+
+/* ---------- 模态 / 抽屉 ---------- */
+.scrim { position: fixed; inset: 0; background: rgba(44,42,39,0.32); backdrop-filter: blur(3px); z-index: 100; opacity: 0; transition: opacity 0.25s var(--ease); }
+.scrim.show { opacity: 1; }
+.drawer {
+  position: fixed; top: 0; right: 0; height: 100vh; width: 460px; max-width: 92vw;
+  background: var(--surface); z-index: 101; box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column;
+  transform: translateX(100%); transition: transform 0.32s var(--ease);
+}
+.drawer.show { transform: translateX(0); }
+.drawer-head { padding: 20px 24px 14px; display: flex; align-items: flex-start; gap: 12px; border-bottom: 1px solid var(--line); }
+.drawer-body { flex: 1; overflow-y: auto; padding: 18px 24px 30px; }
+.drawer-foot { padding: 14px 24px; border-top: 1px solid var(--line); display: flex; gap: 10px; align-items: center; }
+
+.field { margin-bottom: 16px; }
+.field-label { font-size: 11.5px; font-weight: 700; color: var(--ink-3); letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 7px; display: block; }
+.input {
+  width: 100%; padding: 10px 13px; border-radius: var(--r-md); border: 1.5px solid var(--line);
+  background: var(--surface-2); font-size: 14.5px; color: var(--ink); transition: all 0.16s var(--ease);
+}
+.input:focus { outline: none; border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 4px var(--accent-soft); }
+.input.title-input { font-family: var(--font-display); font-size: 19px; font-weight: 700; }
+textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
+.row { display: flex; gap: 12px; }
+.row > * { flex: 1; }
+
+/* 科目选择网格 */
+.subj-pick { display: flex; flex-wrap: wrap; gap: 7px; }
+.subj-chip {
+  padding: 6px 12px; border-radius: var(--r-pill); font-size: 12.5px; font-weight: 600;
+  cursor: pointer; transition: all 0.16s var(--ease); border: 1.5px solid transparent;
+}
+.subj-chip:hover { transform: translateY(-1px); }
+.subj-chip.on { box-shadow: var(--shadow-sm); }
+
+/* 时长快捷 */
+.dur-quick { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.dur-quick button { padding: 5px 12px; border-radius: var(--r-pill); background: var(--bg-soft); font-size: 12.5px; font-weight: 600; color: var(--ink-2); transition: all 0.15s var(--ease); }
+.dur-quick button:hover { background: #ece7df; color: var(--ink); }
+.dur-quick button.on { background: var(--ink); color: #fff; }
+
+/* to-do 列表 */
+.todo-prog { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.todo-bar { flex: 1; height: 7px; background: var(--bg-soft); border-radius: 99px; overflow: hidden; }
+.todo-bar i { display: block; height: 100%; border-radius: 99px; transition: width 0.4s var(--ease); }
+.todo-list { display: flex; flex-direction: column; gap: 2px; }
+.todo-item { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: var(--r-sm); transition: background 0.14s var(--ease); }
+.todo-item:hover { background: var(--surface-2); }
+.todo-item:hover .todo-del { opacity: 1; }
+.todo-check {
+  width: 20px; height: 20px; border-radius: 7px; border: 2px solid var(--line); flex-shrink: 0;
+  display: grid; place-items: center; cursor: pointer; transition: all 0.16s var(--ease); color: #fff;
+}
+.todo-check.on { border-color: transparent; }
+.todo-check svg { opacity: 0; transform: scale(0.5); transition: all 0.18s var(--ease-spring); }
+.todo-check.on svg { opacity: 1; transform: scale(1); }
+.todo-text { flex: 1; font-size: 14px; border: none; background: none; padding: 2px 0; color: var(--ink); }
+.todo-text:focus { outline: none; }
+.todo-text.done { text-decoration: line-through; color: var(--ink-3); }
+.todo-del { opacity: 0; width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; color: var(--ink-3); transition: all 0.14s var(--ease); flex-shrink: 0; }
+.todo-del:hover { background: oklch(0.95 0.04 25); color: oklch(0.6 0.18 25); }
+.todo-add { display: flex; align-items: center; gap: 10px; padding: 7px 8px; margin-top: 2px; color: var(--ink-3); cursor: text; }
+.todo-add .todo-check { border-style: dashed; }
+
+/* 统计 modal */
+.modal {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -46%) scale(0.97); opacity: 0;
+  width: 880px; max-width: 94vw; max-height: 88vh; background: var(--surface); border-radius: var(--r-xl);
+  z-index: 101; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; overflow: hidden;
+  transition: all 0.3s var(--ease);
+}
+.modal.show { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+.modal-head { padding: 22px 28px 18px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.modal-title { font-family: var(--font-display); font-size: 23px; font-weight: 700; white-space: nowrap; }
+.modal-body { overflow-y: auto; padding: 22px 28px 28px; }
+
+/* 统计卡 */
+.stat-overview { display: grid; grid-template-columns: auto 1fr; gap: 26px; align-items: center; padding: 18px 22px; background: var(--surface-2); border-radius: var(--r-lg); margin-bottom: 22px; }
+.stat-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.kpi-num { font-family: var(--font-display); font-size: 30px; font-weight: 700; line-height: 1; }
+.kpi-num small { font-size: 15px; color: var(--ink-2); margin-left: 3px; }
+.kpi-label { font-size: 12px; color: var(--ink-2); margin-top: 5px; }
+.subj-stat-row { display: grid; grid-template-columns: 160px 1fr auto; gap: 14px; align-items: center; padding: 11px 6px; border-bottom: 1px solid var(--line-2); }
+.subj-stat-name { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 600; }
+.subj-stat-bars { display: flex; flex-direction: column; gap: 5px; }
+.sbar { height: 9px; border-radius: 99px; background: var(--bg-soft); overflow: hidden; }
+.sbar i { display: block; height: 100%; border-radius: 99px; transition: width 0.5s var(--ease); }
+.subj-stat-fig { text-align: right; font-variant-numeric: tabular-nums; }
+.subj-stat-fig .big { font-family: var(--font-display); font-size: 17px; font-weight: 700; }
+.subj-stat-fig .sm { font-size: 11.5px; color: var(--ink-3); }
+
+.cycle-seg { display: inline-flex; background: var(--bg-soft); border-radius: var(--r-pill); padding: 3px; gap: 2px; }
+.cycle-seg button { padding: 6px 14px; border-radius: var(--r-pill); font-size: 12.5px; font-weight: 600; color: var(--ink-2); transition: all 0.2s var(--ease); }
+.cycle-seg button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
+
+/* 完成率追踪 */
+.track-grid { display: grid; grid-template-columns: minmax(116px, 1.5fr) repeat(3, 1fr); }
+.track-colhead { display: contents; }
+.track-colhead > div { position: sticky; top: 0; background: var(--surface); z-index: 2; padding: 0 0 10px; font-size: 11.5px; font-weight: 700; color: var(--ink-3); letter-spacing: 1px; text-align: center; }
+.track-colhead > div:first-child { text-align: left; }
+.track-group { display: contents; }
+.track-group-name { grid-column: 1 / -1; display: flex; align-items: center; gap: 9px; margin: 16px 0 8px; }
+.track-group-name b { font-family: var(--font-display); font-size: 15.5px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+.track-group-name .gn-note { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; flex-shrink: 0; }
+.track-group-name .gn-line { flex: 1; height: 1px; background: var(--line-2); }
+.track-grp-cell { padding: 0 0 8px; }
+.track-row { display: contents; }
+.track-row > * { padding: 9px 4px; border-bottom: 1px solid var(--line-2); }
+.track-name { display: flex; align-items: center; gap: 9px; font-size: 13.5px; font-weight: 600; }
+.track-name .subj-dot { width: 11px; height: 11px; }
+.track-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.track-cell .tc-frac { font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.track-empty { display: grid; place-items: center; color: var(--ink-3); font-size: 12px; }
+.track-empty small { font-size: 10px; opacity: 0.8; }
+.track-grpring { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.track-grpring .tg-frac { font-size: 10px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+.empty { text-align: center; color: var(--ink-3); padding: 40px 20px; font-size: 14px; }
+
+/* 浮动添加按钮 */
+.fab {
+  position: fixed; right: 26px; bottom: 26px; width: 56px; height: 56px; border-radius: 50%;
+  background: var(--ink); color: #fff; display: grid; place-items: center; box-shadow: var(--shadow-lg);
+  z-index: 40; transition: all 0.22s var(--ease-spring); font-size: 26px;
+}
+.fab:hover { transform: scale(1.08) rotate(90deg); }
+
+/* 进入动画 */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes pop { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: none; } }
+
+.pill-toast {
+  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(20px); opacity: 0;
+  background: var(--ink); color: #fff; padding: 11px 20px; border-radius: var(--r-pill); font-size: 13.5px;
+  font-weight: 600; z-index: 200; box-shadow: var(--shadow-lg); transition: all 0.3s var(--ease-spring); pointer-events: none;
+}
+.pill-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+.menu { background: var(--surface); border-radius: var(--r-md); box-shadow: var(--shadow-lg); padding: 6px; border: 1px solid var(--line); }
+.menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 13px; border-radius: var(--r-sm); font-size: 13.5px; color: var(--ink); transition: background 0.13s var(--ease); text-align: left; }
+.menu button:hover { background: var(--bg-soft); }
+/* 倒计时卡（多个 + 滚轮切换） */
+.countdown {
+  background: linear-gradient(140deg, oklch(0.95 0.05 35), oklch(0.95 0.05 330));
+  border-radius: var(--r-lg); padding: 14px 18px 13px; margin-bottom: 14px;
+  box-shadow: var(--shadow-sm); cursor: pointer; transition: transform 0.2s var(--ease); position: relative; overflow: hidden;
+}
+.countdown:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.countdown.empty-cd { text-align: center; color: var(--ink-2); }
+.cd-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.countdown .cd-label { font-size: 12px; color: var(--ink-2); letter-spacing: 0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cd-wheel-hint { font-size: 9.5px; color: var(--ink-3); background: rgba(255,255,255,0.6); padding: 2px 6px; border-radius: 99px; white-space: nowrap; flex-shrink: 0; }
+.countdown .cd-num { font-family: var(--font-display); font-size: 38px; font-weight: 700; line-height: 1; margin: 5px 0 4px; }
+.countdown .cd-num small { font-size: 15px; font-weight: 600; color: var(--ink-2); margin-left: 4px; }
+.cd-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.countdown .cd-exam { font-size: 12px; color: var(--ink-2); }
+.cd-dots { display: flex; gap: 4px; }
+.cd-dots i { width: 5px; height: 5px; border-radius: 50%; background: rgba(0,0,0,0.16); transition: all 0.2s var(--ease); }
+.cd-dots i.on { background: var(--accent-ink); width: 14px; border-radius: 99px; }
+.cd-edit-card { background: var(--surface-2); border-radius: var(--r-md); padding: 12px; border: 1px solid var(--line); }
+.cd-emoji-sel { font-size: 18px; border: 1.5px solid var(--line); border-radius: 9px; background: var(--surface); padding: 5px 4px; cursor: pointer; }
+.cd-emoji-sel:focus { outline: none; border-color: var(--accent); }
+
+/* 座右铭横幅 */
+.motto-bar {
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  padding: 13px 24px 12px; flex-shrink: 0;
+  background: radial-gradient(120% 180% at 50% -40%, oklch(0.97 0.035 60), transparent 70%);
+  border-bottom: 1px solid var(--line-2);
+}
+.motto-orn { font-size: 12px; color: var(--accent); opacity: 0.55; flex-shrink: 0; }
+.motto-text {
+  font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--ink);
+  letter-spacing: 1.5px; text-align: center; max-width: 70ch; line-height: 1.4;
+  padding: 3px 12px; border-radius: 8px; transition: background 0.18s var(--ease); cursor: text;
+}
+.motto-text:hover { background: rgba(0,0,0,0.025); }
+.motto-input {
+  font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--ink);
+  letter-spacing: 1.5px; text-align: center; border: none; background: rgba(255,255,255,0.7);
+  border-radius: 8px; padding: 3px 14px; min-width: 340px; max-width: 70ch; box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.motto-input:focus { outline: none; }
+
+/* 每日备忘录 */
+.memo-box { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 11px 12px 8px; margin-bottom: 8px; }
+.memo-head { display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 700; color: var(--ink-2); letter-spacing: 0.5px; margin-bottom: 8px; }
+.memo-head > span:first-of-type { flex: 1; }
+.memo-count { color: var(--ink-3); font-weight: 600; }
+.memo-clear { font-size: 11px; color: var(--ink-3); padding: 2px 7px; border-radius: 99px; }
+.memo-clear:hover { background: var(--bg-soft); color: var(--ink); }
+.memo-list { display: flex; flex-direction: column; gap: 1px; }
+.memo-item { display: flex; align-items: center; gap: 8px; padding: 4px 3px; border-radius: 7px; transition: background 0.13s; }
+.memo-item:hover { background: var(--surface-2); }
+.memo-item:hover .memo-del { opacity: 1; }
+.memo-check { width: 17px; height: 17px; border-radius: 6px; border: 2px solid var(--line); flex-shrink: 0; display: grid; place-items: center; cursor: pointer; color: #fff; transition: all 0.15s var(--ease); }
+.memo-check.on { background: var(--accent); border-color: transparent; }
+.memo-check.dashed { border-style: dashed; color: var(--ink-3); }
+.memo-check svg { opacity: 0; transition: opacity 0.15s; }
+.memo-check.on svg { opacity: 1; }
+.memo-text { flex: 1; font-size: 13px; color: var(--ink); cursor: pointer; line-height: 1.4; word-break: break-word; }
+.memo-text.done { text-decoration: line-through; color: var(--ink-3); }
+.memo-add input { flex: 1; border: none; background: none; font-size: 13px; color: var(--ink); padding: 2px 0; }
+.memo-add input:focus { outline: none; }
+.memo-del { opacity: 0; width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; color: var(--ink-3); flex-shrink: 0; transition: all 0.13s; }
+.memo-del:hover { background: oklch(0.95 0.04 25); color: oklch(0.6 0.18 25); }
+
+/* 科目条目加箭头 */
+.subj-item .icon-arrow, .subj-item svg { color: var(--ink-3); opacity: 0; transition: opacity 0.15s var(--ease); flex-shrink: 0; }
+.subj-item:hover svg { opacity: 0.6; }
+.subj-item .subj-dot { cursor: pointer; }
+.subj-item .subj-dot:hover { box-shadow: inset 0 0 0 1.5px rgba(0,0,0,0.05), 0 0 0 3px var(--bg-soft); }
+
+/* 科目目标回顾 */
+.rv-overview { display: grid; grid-template-columns: auto 1fr; gap: 24px; align-items: center; padding: 18px 22px; border-radius: var(--r-lg); margin-bottom: 12px; }
+.rv-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.rv-kpis b { display: block; font-size: 22px; font-weight: 700; line-height: 1; }
+.rv-kpis span { font-size: 11.5px; color: var(--ink-2); margin-top: 5px; display: block; }
+.rv-month { border: 1px solid var(--line); border-radius: var(--r-md); margin-bottom: 8px; overflow: hidden; transition: box-shadow 0.2s var(--ease); }
+.rv-month.open { box-shadow: var(--shadow-sm); }
+.rv-month-head { display: flex; align-items: center; gap: 11px; padding: 11px 14px; cursor: pointer; transition: background 0.15s; }
+.rv-month-head:hover { background: var(--surface-2); }
+.rv-month-head > svg { color: var(--ink-3); flex-shrink: 0; }
+.rv-month-name { font-size: 16px; font-weight: 700; width: 44px; flex-shrink: 0; }
+.rv-month-bar { flex: 1; height: 8px; background: var(--bg-soft); border-radius: 99px; overflow: hidden; }
+.rv-month-bar i { display: block; height: 100%; border-radius: 99px; transition: width 0.5s var(--ease); }
+.rv-month-pct { font-size: 14px; font-weight: 700; width: 42px; text-align: right; }
+.rv-month-fig { font-size: 11.5px; color: var(--ink-3); width: 88px; text-align: right; }
+.rv-weeks { padding: 4px 14px 14px; border-top: 1px solid var(--line-2); }
+.rv-goalset { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-2); padding: 11px 2px; }
+.rv-week { display: flex; align-items: center; gap: 11px; padding: 7px 2px; }
+.rv-week.blank { opacity: 0.5; }
+.rv-week-label { font-size: 12.5px; color: var(--ink); width: 118px; flex-shrink: 0; }
+.rv-week-label small { color: var(--ink-3); font-size: 11px; }
+.rv-week-bar { flex: 1; height: 7px; background: var(--bg-soft); border-radius: 99px; overflow: hidden; }
+.rv-week-bar i { display: block; height: 100%; border-radius: 99px; }
+.rv-week-pct { font-size: 12.5px; font-weight: 700; color: var(--ink-2); width: 38px; text-align: right; }
+.rv-week-fig { font-size: 11px; color: var(--ink-3); width: 96px; text-align: right; }
+
+.menu hr { border: none; border-top: 1px solid var(--line-2); margin: 5px 0; }
+
+/* ---------- AI 排课助手 ---------- */
+.ai-panel {
+  position: fixed; right: 22px; bottom: 22px; width: 392px; max-width: calc(100vw - 32px);
+  height: 580px; max-height: calc(100vh - 44px); background: var(--surface); z-index: 110;
+  border-radius: var(--r-xl); box-shadow: var(--shadow-lg); display: flex; flex-direction: column;
+  overflow: hidden; transform: translateY(24px) scale(0.97); opacity: 0; transition: all 0.3s var(--ease-spring);
+}
+.ai-panel.show { transform: none; opacity: 1; }
+.ai-head { display: flex; align-items: center; gap: 11px; padding: 15px 16px 13px; border-bottom: 1px solid var(--line); }
+.ai-mark { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(140deg, oklch(0.78 0.13 35), oklch(0.74 0.13 350)); box-shadow: var(--shadow-sm); }
+.ai-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.ai-msg { display: flex; }
+.ai-msg.user { justify-content: flex-end; }
+.ai-bubble { max-width: 85%; padding: 10px 13px; border-radius: 16px; font-size: 13.5px; line-height: 1.55; }
+.ai-bubble.ai { background: var(--bg-soft); border-bottom-left-radius: 5px; color: var(--ink); }
+.ai-bubble.user { background: var(--ink); color: #fff; border-bottom-right-radius: 5px; }
+.ai-changes { margin-top: 9px; display: flex; flex-direction: column; gap: 5px; }
+.ai-change { display: flex; align-items: flex-start; gap: 7px; font-size: 12.5px; background: var(--surface); border-radius: 9px; padding: 6px 9px; line-height: 1.4; }
+.ai-change .acd { width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+.ai-change.create .acd { background: oklch(0.72 0.16 150); }
+.ai-change.update .acd { background: var(--accent); }
+.ai-change.delete .acd { background: oklch(0.7 0.16 28); }
+.ai-undo { margin-top: 8px; font-size: 12.5px; font-weight: 600; color: var(--accent-ink); padding: 5px 11px; border-radius: 99px; background: var(--surface); transition: background 0.15s; }
+.ai-undo:hover { background: var(--accent-soft); }
+.ai-typing { display: flex; gap: 4px; padding: 12px 14px !important; }
+.ai-typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); animation: blink 1.2s infinite both; }
+.ai-typing i:nth-child(2) { animation-delay: 0.2s; }
+.ai-typing i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink { 0%, 60%, 100% { opacity: 0.25; } 30% { opacity: 1; } }
+.ai-quick { padding: 0 16px 10px; display: flex; flex-direction: column; gap: 6px; }
+.ai-quick button { text-align: left; font-size: 12.5px; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; padding: 8px 11px; transition: all 0.15s var(--ease); }
+.ai-quick button:hover { background: var(--bg-soft); color: var(--ink); transform: translateX(2px); }
+.ai-input { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--line); }
+.ai-input input { flex: 1; border: 1.5px solid var(--line); background: var(--surface-2); border-radius: var(--r-pill); padding: 9px 15px; font-size: 14px; color: var(--ink); }
+.ai-input input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+.ai-mic, .ai-send { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; transition: all 0.16s var(--ease); }
+.ai-mic { background: var(--bg-soft); color: var(--ink-2); }
+.ai-mic:hover { background: #ece7df; }
+.ai-mic.on { background: oklch(0.7 0.17 28); color: #fff; animation: micpulse 1.2s infinite; }
+@keyframes micpulse { 0%, 100% { box-shadow: 0 0 0 0 oklch(0.7 0.17 28 / 0.4); } 50% { box-shadow: 0 0 0 7px oklch(0.7 0.17 28 / 0); } }
+.ai-send { background: var(--ink); color: #fff; }
+.ai-send:disabled { opacity: 0.35; cursor: default; }
+.ai-send:not(:disabled):hover { transform: scale(1.06); }
+
+/* ---------- 每周规划 ---------- */
+.goal-card { background: var(--surface-2); border-radius: var(--r-lg); padding: 16px 18px; }
+.wd-pick { display: flex; gap: 5px; }
+.wd-pick button { width: 34px; height: 34px; border-radius: 10px; background: var(--surface); border: 1.5px solid var(--line); font-size: 13px; font-weight: 600; color: var(--ink-2); transition: all 0.15s var(--ease); }
+.wd-pick button:hover { border-color: var(--ink-3); }
+
+/* ---------- 报告 ---------- */
+.report-sheet { background: var(--surface); }
+.rep-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding-bottom: 18px; border-bottom: 2px solid var(--ink); margin-bottom: 18px; }
+.rep-kicker { font-size: 12px; font-weight: 700; color: var(--accent-ink); letter-spacing: 1px; }
+.rep-title { font-size: 27px; font-weight: 700; margin: 7px 0 6px; line-height: 1.2; }
+.rep-range { font-size: 13px; color: var(--ink-3); }
+.rep-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; }
+.rep-kpis > div { background: var(--surface-2); border-radius: var(--r-md); padding: 13px 15px; }
+.rep-kpis b { display: block; font-size: 23px; font-weight: 700; line-height: 1; }
+.rep-kpis span { font-size: 11.5px; color: var(--ink-2); margin-top: 5px; display: block; }
+.rep-section { margin-bottom: 20px; }
+.rep-section h4 { font-family: var(--font-display); font-size: 15.5px; font-weight: 700; margin: 0 0 9px; }
+.rep-section p { font-size: 13.5px; line-height: 1.65; color: var(--ink); margin: 0; }
+.rep-section ul, .rep-section ol { margin: 0; padding-left: 20px; }
+.rep-section li { font-size: 13.5px; line-height: 1.7; color: var(--ink); }
+.rep-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.rep-suggest { background: var(--accent-soft); border-radius: var(--r-lg); padding: 16px 20px; }
+.rep-suggest h4 { color: var(--accent-ink); }
+.rep-subj { margin-bottom: 13px; }
+.rep-subj-top { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.rep-subj-top b { font-weight: 600; }
+.rep-subj-fig { margin-left: auto; font-size: 11.5px; color: var(--ink-3); }
+.rep-subj-comment { font-size: 12.5px; color: var(--ink-2); margin: 2px 0 0; line-height: 1.5; }
+
+/* 子项编辑 */
+.subitem-wrap { margin-top: 11px; padding-top: 11px; border-top: 1px dashed var(--line); }
+.subitem-head { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; color: var(--ink-3); letter-spacing: 0.5px; margin-bottom: 6px; padding: 0 2px; }
+.subitem-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.subitem-name { flex: 1; padding: 7px 11px; border-radius: var(--r-sm); border: 1.5px solid var(--line); background: var(--surface); font-size: 13.5px; color: var(--ink); }
+.subitem-name:focus { outline: none; border-color: var(--accent); background: #fff; box-shadow: 0 0 0 3px var(--accent-soft); }
+.subitem-nums { display: flex; align-items: center; gap: 5px; width: 96px; flex-shrink: 0; justify-content: center; }
+.subitem-nums .input { width: 40px; padding: 6px 4px; text-align: center; font-weight: 700; }
+.subitem-nums span { color: var(--ink-3); font-size: 13px; }
+.subitem-add { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--accent-ink); padding: 5px 11px; border-radius: 99px; background: var(--accent-soft); transition: all 0.15s var(--ease); }
+.subitem-add:hover { filter: brightness(0.97); }
+
+/* 报告里的子项 */
+.rep-subitems { margin: 7px 0 0 16px; padding-left: 12px; border-left: 2px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+.rep-subitem { display: flex; align-items: center; gap: 9px; font-size: 12.5px; flex-wrap: wrap; }
+.rep-si-name { font-weight: 600; color: var(--ink); width: 96px; flex-shrink: 0; }
+.rep-si-bar { flex: 0 0 120px; height: 6px; background: var(--bg-soft); border-radius: 99px; overflow: hidden; }
+.rep-si-bar i { display: block; height: 100%; border-radius: 99px; }
+.rep-si-fig { color: var(--ink-3); font-size: 11.5px; width: 54px; text-align: right; }
+.rep-si-pct { font-weight: 700; width: 38px; text-align: right; }
+.rep-si-comment { color: var(--ink-2); font-size: 12px; flex: 1; min-width: 120px; }
+.rep-foot { text-align: center; font-size: 11px; color: var(--ink-3); padding-top: 14px; border-top: 1px solid var(--line); margin-top: 6px; }
+
+@media print {
+  body.printing-report { overflow: visible; }
+  body.printing-report .app, body.printing-report .scrim, body.printing-report .no-print,
+  body.printing-report .fab, body.printing-report .ai-panel { display: none !important; }
+  body.printing-report .modal { position: static; transform: none !important; box-shadow: none; width: auto; max-height: none; opacity: 1; }
+  body.printing-report .modal-body { overflow: visible; padding: 0; }
+  body.printing-report .report-sheet { padding: 0; }
+  @page { margin: 16mm; }
+}
+
+@media (max-width: 760px) {
+  .sidebar { position: fixed; z-index: 50; height: 100vh; box-shadow: var(--shadow-lg); }
+  .period-label { min-width: auto; }
+  .brand-sub { display: none; }
+}
+
+</style>
+</head>
+<body>
+  <template id="__bundler_thumbnail">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100" height="100" rx="22" fill="#fbf9f6"/>
+      <rect x="30" y="28" width="40" height="9" rx="4.5" fill="#ffd6a5"/>
+      <rect x="30" y="44" width="40" height="9" rx="4.5" fill="#caffbf"/>
+      <rect x="30" y="60" width="26" height="9" rx="4.5" fill="#a0c4ff"/>
+      <circle cx="68" cy="64.5" r="6" fill="none" stroke="#bdb2ff" stroke-width="3"/>
+    </svg>
+  </template>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script>
+/* ============ 备考日历 · 数据层 (plain JS) ============ */
+(function () {
+  const KEY = "beikao-cal-v2";
+
+  // ---------- 颜色：浅色多巴胺，按色相均匀分布 ----------
+  function subjColors(hue) {
+    return {
+      hue,
+      fill: `oklch(0.93 0.072 ${hue})`,
+      fillStrong: `oklch(0.88 0.10 ${hue})`,
+      ink: `oklch(0.46 0.13 ${hue})`,
+      solid: `oklch(0.80 0.135 ${hue})`,
+      line: `oklch(0.86 0.085 ${hue})`,
+    };
+  }
+
+  // 预置科目（法考 / 法学课程 / 保研），色相手工挑选保证相邻区分
+  const SUBJECT_DEFS = [
+    // 法考
+    ["刑法", "法考", 25],
+    ["民法", "法考", 50],
+    ["商法", "法考", 78],
+    ["经济法", "法考", 135],
+    ["知识产权法", "法考", 165],
+    ["三国法", "法考", 195],
+    ["民诉", "法考", 225],
+    ["刑诉", "法考", 258],
+    ["行政法", "法考", 290],
+    ["理论法", "法考", 330],
+    // 法学课程
+    ["区域刑法学", "法学课程", 12],
+    ["侵权法学", "法学课程", 105],
+    ["破产法学", "法学课程", 210],
+    ["刑事监察法学", "法学课程", 305],
+    // 保研
+    ["经济法保研", "保研", 60],
+  ];
+
+  function defaultSubjects() {
+    return SUBJECT_DEFS.map(([name, group, hue], i) => ({
+      id: "s" + i,
+      name,
+      group,
+      ...subjColors(hue),
+    }));
+  }
+
+  const GROUP_ORDER = ["法考", "法学课程", "保研"];
+
+  // ---------- 日期工具 (周一为起) ----------
+  function pad(n) { return String(n).padStart(2, "0"); }
+  function iso(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+  function parseISO(s) { const [y, m, dd] = s.split("-").map(Number); return new Date(y, m - 1, dd); }
+  function today() { return iso(new Date()); }
+  function addDays(s, n) { const d = parseISO(s); d.setDate(d.getDate() + n); return iso(d); }
+  function dow(s) { return (parseISO(s).getDay() + 6) % 7; } // 0=Mon..6=Sun
+  function startOfWeek(s) { return addDays(s, -dow(s)); }
+  function startOfMonth(s) { const d = parseISO(s); return iso(new Date(d.getFullYear(), d.getMonth(), 1)); }
+  function endOfMonth(s) { const d = parseISO(s); return iso(new Date(d.getFullYear(), d.getMonth() + 1, 0)); }
+  function daysBetween(a, b) { return Math.round((parseISO(b) - parseISO(a)) / 86400000); }
+  function sameMonth(a, b) { return a.slice(0, 7) === b.slice(0, 7); }
+
+  const DOW_CN = ["一", "二", "三", "四", "五", "六", "日"];
+  const MONTH_CN = ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"];
+
+  function monthGrid(anchor) {
+    // 返回 6*7=42 天，从锚点所在月首所在周一开始
+    const first = startOfMonth(anchor);
+    const gridStart = startOfWeek(first);
+    const cells = [];
+    for (let i = 0; i < 42; i++) cells.push(addDays(gridStart, i));
+    return cells;
+  }
+  function weekDays(anchor) {
+    const s = startOfWeek(anchor);
+    return Array.from({ length: 7 }, (_, i) => addDays(s, i));
+  }
+
+  function fmtMin(min) {
+    if (!min) return "0m";
+    const h = Math.floor(min / 60), m = min % 60;
+    if (h && m) return `${h}h${m}`;
+    if (h) return `${h}h`;
+    return `${m}m`;
+  }
+  function fmtHrs(min) { return (min / 60).toFixed(1); }
+
+  function minToTime(min) { return `${pad(Math.floor(min / 60))}:${pad(min % 60)}`; }
+  function timeToMin(t) { if (!t) return null; const [h, m] = t.split(":").map(Number); return h * 60 + m; }
+
+  // ---------- 默认种子数据（相对今天，确保始终“当下”） ----------
+  function seed(subjects) {
+    const find = (n) => subjects.find((s) => s.name === n).id;
+    const t = today();
+    const ev = [];
+    let idc = 1;
+    const mk = (dayOffset, subjName, title, start, dur, todos, done) => {
+      ev.push({
+        id: "e" + (idc++),
+        date: addDays(t, dayOffset),
+        subjectId: find(subjName),
+        title,
+        start,
+        durationMin: dur,
+        done: !!done,
+        notes: "",
+        todos: (todos || []).map((tt, i) => ({
+          id: "t" + idc + "_" + i,
+          text: typeof tt === "string" ? tt : tt[0],
+          done: typeof tt === "string" ? false : !!tt[1],
+        })),
+      });
+    };
+    mk(0, "刑法", "刑法总论 · 犯罪构成", "08:30", 90,
+      [["看课：犯罪客观要件", true], ["背诵：因果关系学说", true], "做题：真题30道", "整理错题本"], false);
+    mk(0, "民法", "合同编 · 违约责任", "10:30", 75,
+      [["精读法条 577-584", true], "案例分析2例", "对比预期违约/实际违约"], false);
+    mk(0, "理论法", "宪法 · 国家机构", "14:00", 60,
+      [["框架背诵", true], ["默写", true]], true);
+    mk(0, "经济法保研", "竞争法专题论文研读", "16:00", 90,
+      ["读《反垄断法》修订评述", "做读书笔记", "整理面试问答"], false);
+    mk(1, "民诉", "管辖 + 证据", "09:00", 90,
+      ["体系图记忆", "真题一套", "对答案订正"], false);
+    mk(1, "知识产权法", "专利授权条件", "11:00", 60, ["三性判断标准", "典型案例"], false);
+    mk(1, "区域刑法学", "讲座笔记整理", "15:00", 45, ["整理课堂录音", "提炼论点"], false);
+    mk(2, "刑诉", "强制措施体系", "08:30", 75, ["对比五种措施", "真题20道"], false);
+    mk(2, "行政法", "行政处罚法", "10:30", 60, ["新法变化梳理", "记忆口诀"], false);
+    mk(2, "商法", "公司资本制度", "14:00", 60, ["认缴/实缴", "做题"], false);
+    mk(3, "三国法", "国际私法 · 冲突规范", "09:00", 75, ["连结点记忆", "案例"], false);
+    mk(3, "侵权法学", "产品责任案例研讨", "11:00", 60, ["案例阅读", "观点整理"], false);
+    mk(4, "经济法", "税法专题", "09:00", 90, ["增值税计算", "真题"], false);
+    mk(4, "破产法学", "重整程序", "14:00", 60, ["流程图", "笔记"], false);
+    mk(-1, "刑法", "刑法分论 · 财产犯罪", "09:00", 90,
+      [["盗窃/抢劫区分", true], ["真题", true], ["错题整理", true]], true);
+    mk(-1, "民法", "物权编复习", "14:00", 60, [["善意取得", true], ["做题", true]], true);
+    return ev;
+  }
+
+  // ---------- 持久化 ----------
+  function defaultState() {
+    const subjects = defaultSubjects();
+    // 默认考试日：从今天起 90 天（用户可改）
+    return {
+      version: 3,
+      subjects,
+      events: seed(subjects),
+      settings: {
+        dailyGoalMin: 360,
+        hiddenSubjects: [],
+        motto: "千里之行，始于足下。今天也要踏实地走一步。",
+        apiKey: "",
+        activeCountdown: 0,
+      },
+      countdowns: [
+        { id: "c1", name: "法考客观题", date: addDays(today(), 90), emoji: "⚖️" },
+        { id: "c2", name: "期末考试", date: addDays(today(), 45), emoji: "📚" },
+      ],
+      memos: [], // [{id, text, done, date(创建日)}]
+      weeklyPlans: {}, // weekKey -> [{subjectId, goalHours, dailyTodos:[], weekdays, startTime}]
+      monthlyGoals: {}, // monthKey -> [{id, subjectId, name, totalHours, subItems:[{id,name,hours,done}]}]
+      weeklyGoals: {}, // weekKey -> 同上结构（周报用）
+    };
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return defaultState();
+      const s = JSON.parse(raw);
+      if (!s || !s.subjects || !s.events) return defaultState();
+      const def = defaultState();
+      s.settings = Object.assign({}, def.settings, s.settings || {});
+      s.weeklyPlans = s.weeklyPlans || {};
+      s.monthlyGoals = s.monthlyGoals || {};
+      s.weeklyGoals = s.weeklyGoals || {};
+      s.memos = s.memos || [];
+      // 迁移：旧的 examName/examDate -> countdowns
+      if (!s.countdowns) {
+        s.countdowns = [];
+        if (s.settings.examName || s.settings.examDate) {
+          s.countdowns.push({ id: uid("c"), name: s.settings.examName || "考试", date: s.settings.examDate || addDays(today(), 90), emoji: "⚖️" });
+        }
+        if (!s.countdowns.length) s.countdowns = def.countdowns;
+      }
+      if (s.settings.activeCountdown == null) s.settings.activeCountdown = 0;
+      if (s.settings.motto == null) s.settings.motto = def.settings.motto;
+      return s;
+    } catch (e) {
+      console.warn("load fail", e);
+      return defaultState();
+    }
+  }
+  function save(state) {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { console.warn("save fail", e); }
+  }
+  function reset() { localStorage.removeItem(KEY); }
+
+  // ---------- 统计聚合 ----------
+  function eventCompletion(ev) {
+    // 返回 {ratio, done, total} 基于 to-do；无 to-do 则按 done 标记
+    if (ev.todos && ev.todos.length) {
+      const d = ev.todos.filter((t) => t.done).length;
+      return { ratio: d / ev.todos.length, done: d, total: ev.todos.length };
+    }
+    return { ratio: ev.done ? 1 : 0, done: ev.done ? 1 : 0, total: ev.done ? 1 : 0 };
+  }
+  function isEventDone(ev) {
+    if (ev.todos && ev.todos.length) return ev.todos.every((t) => t.done);
+    return !!ev.done;
+  }
+
+  function dayStats(events, date, goalMin) {
+    const list = events.filter((e) => e.date === date);
+    const planned = list.reduce((a, e) => a + (e.durationMin || 0), 0);
+    const doneMin = list.reduce((a, e) => a + (isEventDone(e) ? e.durationMin || 0 : 0), 0);
+    return { planned, doneMin, count: list.length, goal: goalMin, ratio: goalMin ? Math.min(1, doneMin / goalMin) : 0 };
+  }
+
+  function rangeStats(events, subjects, from, to) {
+    // 返回每个科目 {plannedMin, doneMin, todoTotal, todoDone, count}
+    const map = {};
+    subjects.forEach((s) => (map[s.id] = { plannedMin: 0, doneMin: 0, todoTotal: 0, todoDone: 0, count: 0 }));
+    let totPlanned = 0, totDone = 0, totTodo = 0, totTodoDone = 0;
+    events.forEach((e) => {
+      if (e.date < from || e.date > to) return;
+      const m = map[e.subjectId];
+      if (!m) return;
+      m.count++;
+      m.plannedMin += e.durationMin || 0;
+      totPlanned += e.durationMin || 0;
+      if (isEventDone(e)) { m.doneMin += e.durationMin || 0; totDone += e.durationMin || 0; }
+      const c = eventCompletion(e);
+      m.todoTotal += c.total; m.todoDone += c.done;
+      totTodo += c.total; totTodoDone += c.done;
+    });
+    return { map, totPlanned, totDone, totTodo, totTodoDone };
+  }
+
+  // ---------- ICS 导出 ----------
+  function icsEscape(s) { return (s || "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n"); }
+  function dtStamp() {
+    const d = new Date();
+    return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;
+  }
+  function buildICS(state) {
+    const lines = [
+      "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//备考日历//CN", "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH", "X-WR-CALNAME:备考日历", "X-WR-TIMEZONE:Asia/Shanghai",
+    ];
+    const subjById = {};
+    state.subjects.forEach((s) => (subjById[s.id] = s));
+    state.events.forEach((e) => {
+      const s = subjById[e.subjectId];
+      const d = e.date.replace(/-/g, "");
+      const summary = icsEscape(`${s ? "【" + s.name + "】" : ""}${e.title}`);
+      let dt;
+      if (e.start) {
+        const sm = timeToMin(e.start);
+        const em = sm + (e.durationMin || 60);
+        dt = [`DTSTART;TZID=Asia/Shanghai:${d}T${pad(Math.floor(sm / 60))}${pad(sm % 60)}00`,
+        `DTEND;TZID=Asia/Shanghai:${d}T${pad(Math.floor(em / 60) % 24)}${pad(em % 60)}00`];
+      } else {
+        dt = [`DTSTART;VALUE=DATE:${d}`, `DTEND;VALUE=DATE:${d}`];
+      }
+      const todoTxt = (e.todos || []).map((t) => `${t.done ? "✓" : "○"} ${t.text}`).join("\\n");
+      const desc = icsEscape(`计划时长 ${fmtMin(e.durationMin)}` + (todoTxt ? "\n清单:\n" : "")) + todoTxt + (e.notes ? "\\n\\n" + icsEscape(e.notes) : "");
+      lines.push("BEGIN:VEVENT", `UID:${e.id}@beikao-cal`, `DTSTAMP:${dtStamp()}`, ...dt,
+        `SUMMARY:${summary}`, `DESCRIPTION:${desc}`,
+        `CATEGORIES:${icsEscape(s ? s.group : "")}`, "END:VEVENT");
+    });
+    lines.push("END:VCALENDAR");
+    return lines.join("\r\n");
+  }
+  function downloadICS(state) {
+    const blob = new Blob([buildICS(state)], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "备考日历.ics";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  function uid(p) { return (p || "x") + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+  // ---------- 周/月 key ----------
+  function weekKey(date) { return startOfWeek(date); }              // 周一 ISO
+  function monthKey(date) { return date.slice(0, 7); }              // YYYY-MM
+
+  function resolveSubject(subjects, name) {
+    if (!name) return null;
+    const n = String(name).trim();
+    let s = subjects.find((x) => x.name === n);
+    if (s) return s;
+    s = subjects.find((x) => n.includes(x.name) || x.name.includes(n));
+    return s || null;
+  }
+
+  // ---------- AI 指令 → 动作应用 ----------
+  // actions: [{op:'create'|'update'|'delete', ...}]; 返回 {events, summary[]}
+  function applyActions(state, actions) {
+    let events = state.events.slice();
+    const summary = [];
+    const subjById = {};
+    state.subjects.forEach((s) => (subjById[s.id] = s));
+    const firstVisible = state.subjects.find((s) => !(state.settings.hiddenSubjects || []).includes(s.id)) || state.subjects[0];
+    const toTodos = (arr) => (arr || []).map((t) => ({
+      id: uid("t"), text: typeof t === "string" ? t : (t.text || ""), done: typeof t === "object" ? !!t.done : false,
+    }));
+
+    (actions || []).forEach((a) => {
+      if (!a || !a.op) return;
+      if (a.op === "create") {
+        const subj = resolveSubject(state.subjects, a.subject) || firstVisible;
+        const ev = {
+          id: uid("e"), date: a.date || today(), subjectId: subj.id,
+          title: a.title || "学习任务", start: a.start || null,
+          durationMin: Math.max(10, +a.durationMin || 60), done: !!a.done, notes: a.notes || "",
+          todos: toTodos(a.todos),
+        };
+        events.push(ev);
+        summary.push({ op: "create", text: `新增「${subj.name} · ${ev.title}」 ${a.date || ""} ${ev.start || ""} ${fmtMin(ev.durationMin)}` });
+      } else if (a.op === "update") {
+        const idx = events.findIndex((e) => e.id === a.id);
+        if (idx < 0) return;
+        const prev = events[idx];
+        const next = { ...prev };
+        if (a.date) next.date = a.date;
+        if (a.title != null) next.title = a.title;
+        if (a.start !== undefined) next.start = a.start || null;
+        if (a.durationMin != null) next.durationMin = Math.max(10, +a.durationMin);
+        if (a.done != null) next.done = !!a.done;
+        if (a.notes != null) next.notes = a.notes;
+        if (a.subject) { const s = resolveSubject(state.subjects, a.subject); if (s) next.subjectId = s.id; }
+        if (a.todos) next.todos = toTodos(a.todos);
+        events[idx] = next;
+        summary.push({ op: "update", text: `修改「${(subjById[next.subjectId] || {}).name || ""} · ${next.title}」` });
+      } else if (a.op === "delete") {
+        const ev = events.find((e) => e.id === a.id);
+        if (ev) {
+          events = events.filter((e) => e.id !== a.id);
+          summary.push({ op: "delete", text: `删除「${(subjById[ev.subjectId] || {}).name || ""} · ${ev.title}」` });
+        }
+      }
+    });
+    return { events, summary };
+  }
+
+  // 紧凑事件清单（喂给 AI，含 id 以便改/删）
+  function compactEvents(state, from, to) {
+    const subjById = {};
+    state.subjects.forEach((s) => (subjById[s.id] = s));
+    return state.events
+      .filter((e) => (!from || e.date >= from) && (!to || e.date <= to))
+      .sort((a, b) => (a.date + (a.start || "")).localeCompare(b.date + (b.start || "")))
+      .map((e) => {
+        const c = eventCompletion(e);
+        return `${e.id}|${e.date}|${(subjById[e.subjectId] || {}).name || "?"}|${e.start || "--"}|${e.durationMin}m|${e.title}|todo ${c.done}/${c.total}`;
+      });
+  }
+
+  // ---------- 周规划进度：goal vs 计划 vs 完成 ----------
+  function planProgress(state, weekStart) {
+    const plan = (state.weeklyPlans || {})[weekStart] || [];
+    const from = weekStart, to = addDays(weekStart, 6);
+    const { map } = rangeStats(state.events, state.subjects, from, to);
+    return plan.map((p) => {
+      const m = map[p.subjectId] || { plannedMin: 0, doneMin: 0, todoTotal: 0, todoDone: 0, count: 0 };
+      return {
+        ...p,
+        goalMin: Math.round((p.goalHours || 0) * 60),
+        plannedMin: m.plannedMin, doneMin: m.doneMin,
+        todoTotal: m.todoTotal, todoDone: m.todoDone, count: m.count,
+      };
+    });
+  }
+
+  // ---------- 可移植 AI 调用 ----------
+  // 优先用 Claude 环境注入的 window.claude；否则用用户自己的 API key 直连 Anthropic。
+  async function aiComplete(prompt, apiKey) {
+    if (typeof window !== "undefined" && window.claude && window.claude.complete) {
+      return await window.claude.complete(prompt);
+    }
+    const key = apiKey || (window.CalData && window.CalData._apiKey) || "";
+    if (!key) { const e = new Error("NO_AI"); e.code = "NO_AI"; throw e; }
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: "claude-3-5-sonnet-20241022",
+        max_tokens: 2000,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    if (!resp.ok) { const t = await resp.text(); const e = new Error("API " + resp.status + ": " + t.slice(0, 200)); e.code = "API_ERR"; throw e; }
+    const data = await resp.json();
+    return (data.content && data.content[0] && data.content[0].text) || "";
+  }
+  function aiAvailable(state) {
+    return !!(typeof window !== "undefined" && ((window.claude && window.claude.complete) || (state && state.settings && state.settings.apiKey)));
+  }
+
+  // ---------- 每月所含的周（周一起点） ----------
+  function weeksInMonth(monthKeyStr) {
+    const [y, m] = monthKeyStr.split("-").map(Number);
+    const first = iso(new Date(y, m - 1, 1));
+    const last = endOfMonth(first);
+    let w = startOfWeek(first);
+    const out = [];
+    while (w <= last) { out.push(w); w = addDays(w, 7); }
+    return out; // 每个是周一 ISO
+  }
+
+  // ---------- 科目目标回顾（F3）：按月→周聚合 ----------
+  // 完成率口径 = 该范围内该科目 to-do 完成 / 总数
+  function subjectReview(state, subjectId, monthsBack) {
+    const out = [];
+    const base = parseISO(startOfMonth(today()));
+    const n = monthsBack || 4;
+    for (let i = 0; i < n; i++) {
+      const d = new Date(base.getFullYear(), base.getMonth() - i, 1);
+      const mk = iso(d).slice(0, 7);
+      const mFrom = startOfMonth(iso(d)), mTo = endOfMonth(iso(d));
+      const ms = rangeStats(state.events, state.subjects, mFrom, mTo).map[subjectId] || { plannedMin: 0, doneMin: 0, todoTotal: 0, todoDone: 0, count: 0 };
+      // 月度目标（来自 monthlyGoals 或 周计划合计）
+      const mg = ((state.monthlyGoals || {})[mk] || []).find((g) => g.subjectId === subjectId);
+      let goalH = mg ? mg.totalHours : 0;
+      const weeks = weeksInMonth(mk).map((wStart) => {
+        const wTo = addDays(wStart, 6);
+        const ws = rangeStats(state.events, state.subjects, wStart, wTo).map[subjectId] || { plannedMin: 0, doneMin: 0, todoTotal: 0, todoDone: 0, count: 0 };
+        const wp = ((state.weeklyPlans || {})[wStart] || []).find((p) => p.subjectId === subjectId);
+        if (!goalH && wp) goalH = (goalH || 0); // 占位
+        return {
+          weekStart: wStart, to: wTo,
+          goalH: wp ? wp.goalHours : 0,
+          todoTotal: ws.todoTotal, todoDone: ws.todoDone,
+          ratio: ws.todoTotal ? ws.todoDone / ws.todoTotal : 0,
+          doneMin: ws.doneMin, plannedMin: ws.plannedMin, count: ws.count,
+        };
+      });
+      if (!goalH) goalH = weeks.reduce((a, w) => a + (w.goalH || 0), 0);
+      out.push({
+        monthKey: mk,
+        goalH,
+        todoTotal: ms.todoTotal, todoDone: ms.todoDone,
+        ratio: ms.todoTotal ? ms.todoDone / ms.todoTotal : 0,
+        doneMin: ms.doneMin, plannedMin: ms.plannedMin, count: ms.count,
+        weeks,
+      });
+    }
+    return out;
+  }
+
+  window.CalData = {
+    KEY, defaultState, load, save, reset, defaultSubjects, GROUP_ORDER, subjColors,
+    iso, parseISO, today, addDays, dow, startOfWeek, startOfMonth, endOfMonth, daysBetween,
+    sameMonth, monthGrid, weekDays, DOW_CN, MONTH_CN, fmtMin, fmtHrs, minToTime, timeToMin, pad,
+    eventCompletion, isEventDone, dayStats, rangeStats, buildICS, downloadICS, uid,
+    weekKey, monthKey, resolveSubject, applyActions, compactEvents, planProgress,
+    aiComplete, aiAvailable, weeksInMonth, subjectReview,
+  };
+})();
+
+</script>
+  <script type="text/babel">
+/* ============ 备考日历 · 共享组件 ============ */
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+const D = window.CalData;
+
+/* ---------- 图标 (stroke 线性) ---------- */
+function Icon({ name, size = 18, stroke = 1.9 }) {
+  const p = {
+    width: size, height: size, viewBox: "0 0 24 24", fill: "none",
+    stroke: "currentColor", strokeWidth: stroke, strokeLinecap: "round", strokeLinejoin: "round",
+  };
+  const paths = {
+    prev: <polyline points="15 18 9 12 15 6" />,
+    next: <polyline points="9 18 15 12 9 6" />,
+    plus: <g><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></g>,
+    close: <g><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></g>,
+    check: <polyline points="20 6 9 17 4 12" />,
+    trash: <g><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" /></g>,
+    clock: <g><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" /></g>,
+    chart: <g><line x1="4" y1="20" x2="4" y2="10" /><line x1="10" y1="20" x2="10" y2="4" /><line x1="16" y1="20" x2="16" y2="14" /><line x1="22" y1="20" x2="2" y2="20" /></g>,
+    download: <g><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></g>,
+    grip: <g><circle cx="9" cy="6" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="9" cy="18" r="1" /><circle cx="15" cy="6" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="18" r="1" /></g>,
+    cal: <g><rect x="3" y="4" width="18" height="18" rx="3" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="8" y1="2" x2="8" y2="5" /><line x1="16" y1="2" x2="16" y2="5" /></g>,
+    menu: <g><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></g>,
+    gear: <g><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></g>,
+    flame: <path d="M12 2s4 4 4 8a4 4 0 0 1-8 0c0-1 .5-2 .5-2S7 9 7 11a5 5 0 0 0 10 0c0-5-5-9-5-9z" />,
+    target: <g><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.4" fill="currentColor" /></g>,
+    book: <g><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></g>,
+  };
+  return <svg {...p}>{paths[name] || null}</svg>;
+}
+
+/* ---------- 进度环 ---------- */
+function Ring({ value = 0, size = 30, stroke = 4, color = "var(--accent)", track = "var(--bg-soft)", children, glow }) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const v = Math.max(0, Math.min(1, value));
+  return (
+    <div className="ring" style={{ width: size, height: size }}>
+      <svg width={size} height={size}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={track} strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+          strokeDasharray={c} strokeDashoffset={c * (1 - v)} strokeLinecap="round"
+          style={{ transition: "stroke-dashoffset 0.6s var(--ease)", filter: glow ? `drop-shadow(0 0 4px ${color})` : "none" }} />
+      </svg>
+      {children != null && <div className="ring-label">{children}</div>}
+    </div>
+  );
+}
+
+function MiniRing({ value, size = 22 }) {
+  return <Ring value={value} size={size} stroke={3} className="mini-ring" />;
+}
+
+/* ---------- to-do 编辑器 ---------- */
+function TodoEditor({ todos, onChange, color }) {
+  const [adding, setAdding] = useState("");
+  const addRef = useRef(null);
+  const done = todos.filter((t) => t.done).length;
+  const ratio = todos.length ? done / todos.length : 0;
+
+  const toggle = (id) => onChange(todos.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+  const edit = (id, text) => onChange(todos.map((t) => (t.id === id ? { ...t, text } : t)));
+  const del = (id) => onChange(todos.filter((t) => t.id !== id));
+  const add = () => {
+    const v = adding.trim();
+    if (!v) return;
+    onChange([...todos, { id: D.uid("t"), text: v, done: false }]);
+    setAdding("");
+    setTimeout(() => addRef.current && addRef.current.focus(), 10);
+  };
+
+  return (
+    <div>
+      <div className="todo-prog">
+        <div className="todo-bar"><i style={{ width: `${ratio * 100}%`, background: color || "var(--accent)" }} /></div>
+        <span className="tnum" style={{ fontSize: 12.5, color: "var(--ink-2)", fontWeight: 600 }}>{done}/{todos.length}</span>
+      </div>
+      <div className="todo-list">
+        {todos.map((t) => (
+          <div className="todo-item" key={t.id}>
+            <div className={"todo-check" + (t.done ? " on" : "")} onClick={() => toggle(t.id)}
+              style={{ background: t.done ? (color || "var(--accent)") : "transparent", borderColor: t.done ? "transparent" : undefined }}>
+              <Icon name="check" size={13} stroke={3} />
+            </div>
+            <input className={"todo-text" + (t.done ? " done" : "")} value={t.text}
+              onChange={(e) => edit(t.id, e.target.value)} placeholder="待办事项…" />
+            <button className="todo-del" onClick={() => del(t.id)}><Icon name="trash" size={14} /></button>
+          </div>
+        ))}
+        <div className="todo-add" onClick={() => addRef.current && addRef.current.focus()}>
+          <div className="todo-check"><Icon name="plus" size={13} stroke={2.6} /></div>
+          <input ref={addRef} className="todo-text" value={adding} placeholder="添加待办…"
+            onChange={(e) => setAdding(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") add(); }}
+            onBlur={add} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- 事件编辑抽屉 ---------- */
+const DUR_PRESETS = [25, 45, 60, 90, 120];
+
+function EventDrawer({ event, subjects, onSave, onDelete, onClose }) {
+  const [show, setShow] = useState(false);
+  const [draft, setDraft] = useState(event);
+  useEffect(() => { setDraft(event); }, [event && event.id]);
+  useEffect(() => { const t = setTimeout(() => setShow(true), 10); return () => clearTimeout(t); }, []);
+
+  if (!draft) return null;
+  const subj = subjects.find((s) => s.id === draft.subjectId) || subjects[0];
+
+  const close = () => { setShow(false); setTimeout(onClose, 300); };
+  const patch = (p) => setDraft((d) => ({ ...d, ...p }));
+  const commit = (next) => { const v = next || draft; onSave(v); };
+
+  // 自动保存（失焦/关闭时）
+  const handleClose = () => { commit(); close(); };
+
+  const groups = D.GROUP_ORDER.map((g) => [g, subjects.filter((s) => s.group === g)]);
+
+  return (
+    <React.Fragment>
+      <div className={"scrim" + (show ? " show" : "")} onClick={handleClose} />
+      <div className={"drawer" + (show ? " show" : "")}>
+        <div className="drawer-head">
+          <div className="subj-dot" style={{ background: subj.solid, width: 18, height: 18, marginTop: 6 }} />
+          <input className="input title-input" style={{ border: "none", background: "none", padding: 0, boxShadow: "none" }}
+            value={draft.title} placeholder="任务标题…" autoFocus
+            onChange={(e) => patch({ title: e.target.value })} />
+          <button className="icon-btn" onClick={handleClose}><Icon name="close" /></button>
+        </div>
+        <div className="drawer-body">
+          {/* 科目 */}
+          <div className="field">
+            <label className="field-label">科目</label>
+            <div className="subj-pick">
+              {groups.map(([g, list]) => list.map((s) => (
+                <div key={s.id} className={"subj-chip" + (s.id === draft.subjectId ? " on" : "")}
+                  onClick={() => patch({ subjectId: s.id })}
+                  style={{ background: s.id === draft.subjectId ? s.fillStrong : s.fill, color: s.ink, borderColor: s.id === draft.subjectId ? s.solid : "transparent" }}>
+                  {s.name}
+                </div>
+              )))}
+            </div>
+          </div>
+          {/* 日期 / 时间 */}
+          <div className="row">
+            <div className="field">
+              <label className="field-label">日期</label>
+              <input type="date" className="input tnum" value={draft.date} onChange={(e) => patch({ date: e.target.value })} />
+            </div>
+            <div className="field">
+              <label className="field-label">开始时间</label>
+              <input type="time" className="input tnum" value={draft.start || ""} onChange={(e) => patch({ start: e.target.value || null })} />
+            </div>
+          </div>
+          {/* 时长 */}
+          <div className="field">
+            <label className="field-label">计划时长 · {D.fmtMin(draft.durationMin)}</label>
+            <input type="range" min="15" max="240" step="5" value={draft.durationMin}
+              style={{ width: "100%", accentColor: subj.solid }}
+              onChange={(e) => patch({ durationMin: +e.target.value })} />
+            <div className="dur-quick">
+              {DUR_PRESETS.map((m) => (
+                <button key={m} className={draft.durationMin === m ? "on" : ""} onClick={() => patch({ durationMin: m })}>{D.fmtMin(m)}</button>
+              ))}
+            </div>
+          </div>
+          {/* to-do */}
+          <div className="field">
+            <label className="field-label">待办清单 (To-do)</label>
+            <TodoEditor todos={draft.todos} color={subj.solid} onChange={(todos) => patch({ todos })} />
+          </div>
+          {/* 备注 */}
+          <div className="field">
+            <label className="field-label">备注</label>
+            <textarea className="input" value={draft.notes || ""} placeholder="补充说明…"
+              onChange={(e) => patch({ notes: e.target.value })} />
+          </div>
+        </div>
+        <div className="drawer-foot">
+          {onDelete && draft._exists && (
+            <button className="btn btn-ghost" style={{ color: "oklch(0.6 0.18 25)" }}
+              onClick={() => { if (confirm("删除这个任务？")) { onDelete(draft.id); close(); } }}>
+              <Icon name="trash" size={15} /> 删除
+            </button>
+          )}
+          <div className="spacer" />
+          <button className="btn btn-soft" onClick={handleClose}>取消</button>
+          <button className="btn btn-accent" onClick={() => { commit(); close(); }}>
+            <Icon name="check" size={15} stroke={2.6} /> 保存
+          </button>
+        </div>
+      </div>
+    </React.Fragment>
+  );
+}
+
+Object.assign(window, { Icon, Ring, MiniRing, TodoEditor, EventDrawer, DUR_PRESETS });
+
+</script>
+  <script type="text/babel">
+/* ============ 备考日历 · 视图 (月/周/日) ============ */
+const Dv = window.CalData;
+
+function subjOf(subjects, id) { return subjects.find((s) => s.id === id) || subjects[0]; }
+
+/* ---------- 月视图 ---------- */
+function MonthView({ anchor, events, subjects, settings, onDay, onEvent, onAdd }) {
+  const cells = Dv.monthGrid(anchor);
+  const t = Dv.today();
+  const byDay = useMemo(() => {
+    const m = {};
+    events.forEach((e) => { (m[e.date] = m[e.date] || []).push(e); });
+    Object.values(m).forEach((l) => l.sort((a, b) => (a.start || "99").localeCompare(b.start || "99")));
+    return m;
+  }, [events]);
+
+  return (
+    <div className="month">
+      <div className="weekhead">
+        {Dv.DOW_CN.map((d, i) => <div key={d} className={i >= 5 ? "we" : ""}>{d}</div>)}
+      </div>
+      <div className="monthgrid">
+        {cells.map((date) => {
+          const list = byDay[date] || [];
+          const ds = Dv.dayStats(events, date, settings.dailyGoalMin);
+          const dim = date.slice(0, 7) !== anchor.slice(0, 7);
+          const isToday = date === t;
+          const maxShow = 3;
+          return (
+            <div key={date} className={"daycell" + (dim ? " dim" : "") + (isToday ? " today" : "")}
+              onClick={() => onDay(date)} onDoubleClick={() => onAdd(date)}>
+              <div className="dc-top">
+                <span className={"dc-num" + (isToday ? " todaynum" : "")}>{+date.slice(8)}</span>
+                {ds.planned > 0 && <span className="dc-min tnum">{Dv.fmtMin(ds.planned)}</span>}
+              </div>
+              <div className="dc-events">
+                {list.slice(0, maxShow).map((e) => {
+                  const s = subjOf(subjects, e.subjectId);
+                  const done = Dv.isEventDone(e);
+                  return (
+                    <div key={e.id} className={"evpill" + (done ? " done" : "")}
+                      style={{ background: s.fill, color: s.ink }}
+                      onClick={(ev) => { ev.stopPropagation(); onEvent(e); }}>
+                      <span className="evpill-check" style={{ borderColor: s.solid, background: done ? s.solid : "transparent" }} />
+                      <span className="evpill-t">{e.title}</span>
+                    </div>
+                  );
+                })}
+                {list.length > maxShow && <div className="dc-more">+{list.length - maxShow} 更多</div>}
+              </div>
+              {ds.planned > 0 && (
+                <div className="dc-ring">
+                  <Ring value={ds.ratio} size={20} stroke={3}
+                    color={ds.ratio >= 1 ? "oklch(0.72 0.16 150)" : "var(--accent)"} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- 时间轴（周/日共用） ---------- */
+const HOUR_H = 56;
+const START_HOUR = 6;
+const END_HOUR = 24;
+
+function layoutDay(list) {
+  // 为有时间的事件计算重叠列布局
+  const timed = list.filter((e) => e.start).map((e) => {
+    const s = Dv.timeToMin(e.start);
+    return { e, s, end: s + (e.durationMin || 30) };
+  }).sort((a, b) => a.s - b.s || a.end - b.end);
+  // 分组重叠
+  const cols = [];
+  timed.forEach((it) => {
+    let placed = false;
+    for (const col of cols) {
+      if (col[col.length - 1].end <= it.s) { col.push(it); it.col = cols.indexOf(col); placed = true; break; }
+    }
+    if (!placed) { it.col = cols.length; cols.push([it]); }
+  });
+  const ncol = Math.max(1, cols.length);
+  timed.forEach((it) => (it.ncol = ncol));
+  const untimed = list.filter((e) => !e.start);
+  return { timed, untimed };
+}
+
+function NowLine({ date }) {
+  const [, force] = useState(0);
+  useEffect(() => { const i = setInterval(() => force((x) => x + 1), 60000); return () => clearInterval(i); }, []);
+  if (date !== Dv.today()) return null;
+  const now = new Date();
+  const min = now.getHours() * 60 + now.getMinutes();
+  if (min < START_HOUR * 60 || min > END_HOUR * 60) return null;
+  const top = ((min - START_HOUR * 60) / 60) * HOUR_H;
+  return <div className="tl-now" style={{ top }} />;
+}
+
+function TimelineEvent({ it, subjects, onEvent, single }) {
+  const { e } = it;
+  const s = subjOf(subjects, e.subjectId);
+  const done = Dv.isEventDone(e);
+  const top = ((it.s - START_HOUR * 60) / 60) * HOUR_H;
+  const h = Math.max(22, ((e.durationMin || 30) / 60) * HOUR_H - 3);
+  const w = 100 / it.ncol;
+  const comp = Dv.eventCompletion(e);
+  return (
+    <div className={"tl-event" + (done ? " done" : "")}
+      style={{
+        top, height: h, left: `calc(${it.col * w}% + 3px)`, width: `calc(${w}% - 6px)`,
+        background: s.fill, color: s.ink, borderLeftColor: s.solid,
+      }}
+      onClick={() => onEvent(e)}>
+      <div className="te-title">{done ? "✓ " : ""}{e.title}</div>
+      {h > 34 && <div className="te-meta tnum">{e.start} · {Dv.fmtMin(e.durationMin)}{comp.total ? ` · ${comp.done}/${comp.total}` : ""}</div>}
+    </div>
+  );
+}
+
+function Timeline({ days, events, subjects, settings, onEvent, onAdd, onDayHeader }) {
+  const scrollRef = useRef(null);
+  const t = Dv.today();
+  const hours = [];
+  for (let h = START_HOUR; h < END_HOUR; h++) hours.push(h);
+
+  useEffect(() => {
+    // 滚动到 7:30 左右
+    if (scrollRef.current) scrollRef.current.scrollTop = 1.2 * HOUR_H;
+  }, [days[0]]);
+
+  const byDay = useMemo(() => {
+    const m = {};
+    days.forEach((d) => (m[d] = layoutDay(events.filter((e) => e.date === d))));
+    return m;
+  }, [events, days.join()]);
+
+  const colTemplate = `56px repeat(${days.length}, 1fr)`;
+
+  return (
+    <div className="timeline-wrap">
+      <div className="tl-head" style={{ gridTemplateColumns: colTemplate }}>
+        <div className="tl-corner" />
+        {days.map((d) => {
+          const ds = Dv.dayStats(events, d, settings.dailyGoalMin);
+          const isT = d === t;
+          const di = Dv.dow(d);
+          return (
+            <div className="tl-head-cell" key={d} style={{ cursor: onDayHeader ? "pointer" : "default" }}
+              onClick={() => onDayHeader && onDayHeader(d)}>
+              <div className="tl-dow" style={di >= 5 ? { color: "oklch(0.7 0.1 25)" } : null}>周{Dv.DOW_CN[di]}</div>
+              <div className={"tl-date" + (isT ? " today" : "")}>{+d.slice(8)}</div>
+              <div style={{ display: "flex", justifyContent: "center", marginTop: 4 }}>
+                <Ring value={ds.ratio} size={26} stroke={3.5}
+                  color={ds.ratio >= 1 ? "oklch(0.72 0.16 150)" : "var(--accent)"}>
+                  {ds.planned > 0 && <span className="tnum" style={{ fontSize: 8.5, color: "var(--ink-2)", fontWeight: 700 }}>{Math.round(ds.ratio * 100)}</span>}
+                </Ring>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="tl-scroll" ref={scrollRef}>
+        <div className="tl-grid" style={{ gridTemplateColumns: colTemplate, minHeight: hours.length * HOUR_H }}>
+          <div className="tl-hours">
+            {hours.map((h) => (
+              <div className="tl-hour-label" key={h}><span className="tnum">{Dv.pad(h)}:00</span></div>
+            ))}
+          </div>
+          {days.map((d) => {
+            const { timed, untimed } = byDay[d];
+            return (
+              <div className="tl-col" key={d}>
+                {hours.map((h) => (
+                  <div className="tl-hour-line" key={h}
+                    onClick={() => onAdd(d, Dv.minToTime(h * 60))} style={{ cursor: "copy" }} />
+                ))}
+                {timed.map((it) => <TimelineEvent key={it.e.id} it={it} subjects={subjects} onEvent={onEvent} />)}
+                <NowLine date={d} />
+                {untimed.length > 0 && (
+                  <div style={{ position: "absolute", top: 2, left: 3, right: 3, display: "flex", flexDirection: "column", gap: 2 }}>
+                    {untimed.map((e) => {
+                      const s = subjOf(subjects, e.subjectId);
+                      return <div key={e.id} className="evpill" style={{ background: s.fill, color: s.ink }} onClick={() => onEvent(e)}>
+                        <span className="evpill-t">{e.title}</span></div>;
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WeekView(props) {
+  const days = Dv.weekDays(props.anchor);
+  return <Timeline days={days} {...props} onDayHeader={props.onDay} />;
+}
+
+/* ---------- 日视图：时间轴 + 当日清单焦点 ---------- */
+function DayView({ anchor, events, subjects, settings, onEvent, onAdd }) {
+  const list = useMemo(() => events.filter((e) => e.date === anchor)
+    .sort((a, b) => (a.start || "99").localeCompare(b.start || "99")), [events, anchor]);
+  const ds = Dv.dayStats(events, anchor, settings.dailyGoalMin);
+  const totalTodo = list.reduce((a, e) => a + (e.todos ? e.todos.length : 0), 0);
+  const doneTodo = list.reduce((a, e) => a + (e.todos ? e.todos.filter((t) => t.done).length : 0), 0);
+
+  return (
+    <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+        <Timeline days={[anchor]} events={events} subjects={subjects} settings={settings} onEvent={onEvent} onAdd={onAdd} />
+      </div>
+      <div style={{ width: 300, flexShrink: 0, borderLeft: "1px solid var(--line)", padding: "20px 18px", overflowY: "auto", background: "var(--surface-2)" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingBottom: 18, borderBottom: "1px solid var(--line)" }}>
+          <Ring value={ds.ratio} size={128} stroke={12} glow
+            color={ds.ratio >= 1 ? "oklch(0.72 0.16 150)" : "var(--accent)"}>
+            <div>
+              <div className="font-display tnum" style={{ fontSize: 30, fontWeight: 700, lineHeight: 1 }}>{Math.round(ds.ratio * 100)}<small style={{ fontSize: 15 }}>%</small></div>
+              <div style={{ fontSize: 11, color: "var(--ink-2)", marginTop: 3 }}>今日目标</div>
+            </div>
+          </Ring>
+          <div className="tnum" style={{ marginTop: 14, fontSize: 13.5, color: "var(--ink-2)" }}>
+            已完成 <b style={{ color: "var(--ink)" }}>{Dv.fmtMin(ds.doneMin)}</b> / 计划 {Dv.fmtMin(ds.planned)}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 4 }}>目标 {Dv.fmtMin(settings.dailyGoalMin)} · 待办 {doneTodo}/{totalTodo}</div>
+        </div>
+        <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--ink-3)", letterSpacing: 1, margin: "16px 2px 10px" }}>当日任务 ({list.length})</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {list.length === 0 && <div className="empty" style={{ padding: "20px 0" }}>今天还没有安排<br />点击时间轴或 + 添加</div>}
+          {list.map((e) => {
+            const s = subjOf(subjects, e.subjectId);
+            const c = Dv.eventCompletion(e);
+            return (
+              <div key={e.id} onClick={() => onEvent(e)}
+                style={{ background: "var(--surface)", borderRadius: "var(--r-md)", padding: "10px 12px", cursor: "pointer", boxShadow: "var(--shadow-sm)", borderLeft: `3px solid ${s.solid}`, transition: "transform .15s var(--ease)" }}
+                onMouseEnter={(ev) => ev.currentTarget.style.transform = "translateX(2px)"}
+                onMouseLeave={(ev) => ev.currentTarget.style.transform = "none"}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 11, color: s.ink, background: s.fill, padding: "1px 7px", borderRadius: 99, fontWeight: 600 }}>{s.name}</span>
+                  <span className="tnum" style={{ fontSize: 11.5, color: "var(--ink-3)", marginLeft: "auto" }}>{e.start || "—"} · {Dv.fmtMin(e.durationMin)}</span>
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 600, marginTop: 5, textDecoration: Dv.isEventDone(e) ? "line-through" : "none", opacity: Dv.isEventDone(e) ? 0.5 : 1 }}>{e.title}</div>
+                {c.total > 0 && (
+                  <div className="todo-prog" style={{ marginTop: 7, marginBottom: 0 }}>
+                    <div className="todo-bar"><i style={{ width: `${c.ratio * 100}%`, background: s.solid }} /></div>
+                    <span className="tnum" style={{ fontSize: 11, color: "var(--ink-3)" }}>{c.done}/{c.total}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { MonthView, WeekView, DayView, Timeline, subjOf });
+
+</script>
+  <script type="text/babel">
+/* ============ 备考日历 · 座右铭 / 多倒计时 / 每日备忘 / 侧边栏 ============ */
+const Db = window.CalData;
+
+/* ---------- F1 座右铭横幅（神圣激励感，可编辑） ---------- */
+function MottoBar({ motto, onChange }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(motto || "");
+  const ref = useRef(null);
+  useEffect(() => { setDraft(motto || ""); }, [motto]);
+  useEffect(() => { if (editing && ref.current) { ref.current.focus(); ref.current.select(); } }, [editing]);
+  const commit = () => { onChange((draft || "").trim()); setEditing(false); };
+  return (
+    <div className="motto-bar">
+      <span className="motto-orn left">✦</span>
+      {editing ? (
+        <input ref={ref} className="motto-input" value={draft} maxLength={60}
+          onChange={(e) => setDraft(e.target.value)} onBlur={commit}
+          onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setDraft(motto || ""); setEditing(false); } }} />
+      ) : (
+        <button className="motto-text" onClick={() => setEditing(true)} title="点击编辑你的座右铭">
+          {motto || "写下一句激励自己的话 ——"}
+        </button>
+      )}
+      <span className="motto-orn right">✦</span>
+    </div>
+  );
+}
+
+/* ---------- F2 多倒计时卡（滚轮切换 + 点击管理） ---------- */
+function CountdownCard({ countdowns, active, setActive, onManage }) {
+  const list = countdowns && countdowns.length ? countdowns : [];
+  const idx = Math.min(active || 0, Math.max(0, list.length - 1));
+  const cd = list[idx];
+  const wheelLock = useRef(0);
+  const onWheel = (e) => {
+    if (list.length < 2) return;
+    e.preventDefault();
+    const now = Date.now();
+    if (now - wheelLock.current < 220) return;
+    wheelLock.current = now;
+    const dir = e.deltaY > 0 ? 1 : -1;
+    setActive((idx + dir + list.length) % list.length);
+  };
+  if (!cd) {
+    return <div className="countdown empty-cd" onClick={onManage}><div className="cd-label">点击添加倒计时</div><div className="cd-num font-display">＋</div></div>;
+  }
+  const daysLeft = Db.daysBetween(Db.today(), cd.date);
+  return (
+    <div className="countdown" onClick={onManage} onWheel={onWheel} title="滚轮切换 · 点击管理">
+      <div className="cd-row">
+        <div className="cd-label">{cd.emoji ? cd.emoji + " " : ""}距 {cd.name} 还有</div>
+        {list.length > 1 && <span className="cd-wheel-hint">滚轮切换</span>}
+      </div>
+      <div className="cd-num font-display tnum">
+        {daysLeft >= 0 ? daysLeft : "已过"}<small>{daysLeft >= 0 ? "天" : ""}</small>
+      </div>
+      <div className="cd-foot">
+        <span className="cd-exam tnum">{cd.date}</span>
+        {list.length > 1 && (
+          <span className="cd-dots">
+            {list.map((_, i) => <i key={i} className={i === idx ? "on" : ""} />)}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const CD_EMOJI = ["⚖️", "📚", "✍️", "🎓", "📝", "🏛️", "⏰", "🔥", "🌟", "🎯"];
+
+function CountdownManager({ countdowns, onChange, onClose }) {
+  const [show, setShow] = useState(false);
+  const [list, setList] = useState(countdowns.map((c) => ({ ...c })));
+  useEffect(() => { const t = setTimeout(() => setShow(true), 10); return () => clearTimeout(t); }, []);
+  const close = () => { setShow(false); setTimeout(onClose, 280); };
+  const commit = (next) => { setList(next); onChange(next); };
+  const patch = (id, p) => commit(list.map((c) => (c.id === id ? { ...c, ...p } : c)));
+  const add = () => commit([...list, { id: Db.uid("c"), name: "新目标", date: Db.addDays(Db.today(), 30), emoji: CD_EMOJI[list.length % CD_EMOJI.length] }]);
+  const del = (id) => commit(list.filter((c) => c.id !== id));
+
+  return (
+    <React.Fragment>
+      <div className={"scrim" + (show ? " show" : "")} onClick={close} />
+      <div className={"drawer" + (show ? " show" : "")} style={{ width: 420 }}>
+        <div className="drawer-head">
+          <Icon name="clock" size={20} style={{ marginTop: 3 }} />
+          <div className="font-display" style={{ fontSize: 20, fontWeight: 700, flex: 1 }}>倒计时管理</div>
+          <button className="icon-btn" onClick={close}><Icon name="close" /></button>
+        </div>
+        <div className="drawer-body">
+          <p style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.6, margin: "0 0 14px" }}>
+            可添加多个倒计时（各类考试、报名截止…）。在侧边栏卡片上<b>滚动鼠标滚轮</b>即可快速切换查看。
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {list.map((c) => {
+              const d = Db.daysBetween(Db.today(), c.date);
+              return (
+                <div key={c.id} className="cd-edit-card">
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <select className="cd-emoji-sel" value={c.emoji || ""} onChange={(e) => patch(c.id, { emoji: e.target.value })}>
+                      {CD_EMOJI.map((em) => <option key={em} value={em}>{em}</option>)}
+                    </select>
+                    <input className="input" style={{ flex: 1, fontWeight: 600 }} value={c.name}
+                      onChange={(e) => patch(c.id, { name: e.target.value })} placeholder="名称" />
+                    <button className="icon-btn" onClick={() => del(c.id)} style={{ color: "oklch(0.62 0.16 25)" }}><Icon name="trash" size={15} /></button>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 9 }}>
+                    <input type="date" className="input tnum" style={{ flex: 1 }} value={c.date} onChange={(e) => patch(c.id, { date: e.target.value })} />
+                    <span className="tnum" style={{ fontSize: 13, fontWeight: 700, color: d >= 0 ? "var(--accent-ink)" : "var(--ink-3)", whiteSpace: "nowrap" }}>
+                      {d >= 0 ? `还有 ${d} 天` : "已过期"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <button className="btn btn-soft" style={{ marginTop: 14, width: "100%", justifyContent: "center" }} onClick={add}>
+            <Icon name="plus" size={15} /> 添加倒计时
+          </button>
+        </div>
+      </div>
+    </React.Fragment>
+  );
+}
+
+/* ---------- F4 每日备忘录（可打勾） ---------- */
+function MemoBox({ memos, onChange }) {
+  const [adding, setAdding] = useState("");
+  const addRef = useRef(null);
+  const done = memos.filter((m) => m.done).length;
+  const toggle = (id) => onChange(memos.map((m) => (m.id === id ? { ...m, done: !m.done } : m)));
+  const del = (id) => onChange(memos.filter((m) => m.id !== id));
+  const add = () => {
+    const v = adding.trim(); if (!v) return;
+    onChange([...memos, { id: Db.uid("m"), text: v, done: false, date: Db.today() }]);
+    setAdding(""); setTimeout(() => addRef.current && addRef.current.focus(), 10);
+  };
+  const clearDone = () => onChange(memos.filter((m) => !m.done));
+
+  return (
+    <div className="memo-box">
+      <div className="memo-head">
+        <Icon name="check" size={13} stroke={2.6} />
+        <span>每日备忘</span>
+        {memos.length > 0 && <span className="memo-count tnum">{done}/{memos.length}</span>}
+        {done > 0 && <button className="memo-clear" onClick={clearDone} title="清除已完成">清除</button>}
+      </div>
+      <div className="memo-list">
+        {memos.map((m) => (
+          <div className="memo-item" key={m.id}>
+            <div className={"memo-check" + (m.done ? " on" : "")} onClick={() => toggle(m.id)}>
+              <Icon name="check" size={11} stroke={3} />
+            </div>
+            <span className={"memo-text" + (m.done ? " done" : "")} onClick={() => toggle(m.id)}>{m.text}</span>
+            <button className="memo-del" onClick={() => del(m.id)}><Icon name="close" size={12} /></button>
+          </div>
+        ))}
+        <div className="memo-add">
+          <div className="memo-check dashed" onClick={() => addRef.current && addRef.current.focus()}><Icon name="plus" size={11} stroke={2.6} /></div>
+          <input ref={addRef} value={adding} placeholder="记一件事…"
+            onChange={(e) => setAdding(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") add(); }} onBlur={add} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- 侧边栏 ---------- */
+function Sidebar({ collapsed, state, setState, anchor, onManageCountdown, onReviewSubject, toggleSubject }) {
+  const { subjects, events, settings } = state;
+  const weekFrom = Db.startOfWeek(anchor), weekTo = Db.addDays(weekFrom, 6);
+  const { map } = useMemo(() => Db.rangeStats(events, subjects, weekFrom, weekTo), [events, subjects, weekFrom]);
+  const hidden = settings.hiddenSubjects || [];
+  const groups = Db.GROUP_ORDER.map((g) => [g, subjects.filter((s) => s.group === g)]);
+
+  return (
+    <div className={"sidebar" + (collapsed ? " collapsed" : "")}>
+      <CountdownCard countdowns={state.countdowns} active={settings.activeCountdown}
+        setActive={(i) => setState((s) => ({ ...s, settings: { ...s.settings, activeCountdown: i } }))}
+        onManage={onManageCountdown} />
+
+      <MemoBox memos={state.memos || []} onChange={(memos) => setState((s) => ({ ...s, memos }))} />
+
+      <div className="side-title">科目 · 本周时长 <span style={{ fontWeight: 500, textTransform: "none", letterSpacing: 0 }}>点击回顾</span></div>
+      {groups.map(([g, list]) => (
+        <div key={g}>
+          <div className="subj-group-name">{g}</div>
+          {list.map((s) => {
+            const mins = map[s.id] ? map[s.id].plannedMin : 0;
+            const off = hidden.includes(s.id);
+            return (
+              <div key={s.id} className={"subj-item" + (off ? " off" : "")} onClick={() => onReviewSubject(s.id)}>
+                <span className="subj-dot" style={{ background: s.solid }} onClick={(e) => { e.stopPropagation(); toggleSubject(s.id); }} title="点圆点：在日历中显示/隐藏" />
+                <span className="subj-name">{s.name}</span>
+                <span className="subj-min tnum">{mins ? Db.fmtMin(mins) : ""}</span>
+                <Icon name="next" size={13} />
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+Object.assign(window, { MottoBar, CountdownCard, CountdownManager, MemoBox, Sidebar });
+
+</script>
+  <script type="text/babel">
+/* ============ 备考日历 · F3 科目目标回顾（月→周，百分比） ============ */
+const Drv = window.CalData;
+
+function pct(r) { return Math.round((r || 0) * 100); }
+function ringColor(r) { return r >= 1 ? "oklch(0.72 0.16 150)" : r >= 0.6 ? "var(--accent)" : "oklch(0.74 0.14 30)"; }
+
+function SubjectReviewModal({ subjectId, state, setState, onClose }) {
+  const [show, setShow] = useState(false);
+  const [openMonth, setOpenMonth] = useState(Drv.today().slice(0, 7));
+  useEffect(() => { const t = setTimeout(() => setShow(true), 10); return () => clearTimeout(t); }, []);
+  const close = () => { setShow(false); setTimeout(onClose, 280); };
+
+  const subj = state.subjects.find((s) => s.id === subjectId) || state.subjects[0];
+  const review = useMemo(() => Drv.subjectReview(state, subjectId, 4), [state, subjectId]);
+  const hidden = (state.settings.hiddenSubjects || []).includes(subjectId);
+
+  // 总览：近4个月合计
+  const totDone = review.reduce((a, m) => a + m.doneMin, 0);
+  const totTodo = review.reduce((a, m) => a + m.todoTotal, 0);
+  const totTodoDone = review.reduce((a, m) => a + m.todoDone, 0);
+  const totGoalH = review.reduce((a, m) => a + (m.goalH || 0), 0);
+  const overallRatio = totTodo ? totTodoDone / totTodo : 0;
+
+  const monthLabel = (mk) => `${+mk.slice(5, 7)}月`;
+  const setMonthGoal = (mk, h) => setState((s) => {
+    const mg = { ...(s.monthlyGoals || {}) };
+    const arr = (mg[mk] || []).slice();
+    const i = arr.findIndex((g) => g.subjectId === subjectId);
+    if (i >= 0) arr[i] = { ...arr[i], totalHours: h };
+    else arr.push({ id: Drv.uid("g"), subjectId, totalHours: h, subItems: [] });
+    mg[mk] = arr;
+    return { ...s, monthlyGoals: mg };
+  });
+
+  return (
+    <React.Fragment>
+      <div className={"scrim" + (show ? " show" : "")} onClick={close} />
+      <div className={"modal" + (show ? " show" : "")} style={{ width: 660 }}>
+        <div className="modal-head">
+          <span className="subj-dot" style={{ background: subj.solid, width: 20, height: 20 }} />
+          <div className="modal-title">{subj.name}<span style={{ fontSize: 13, color: "var(--ink-3)", fontWeight: 500, marginLeft: 10 }}>{subj.group} · 目标回顾</span></div>
+          <div className="spacer" />
+          <button className={"btn " + (hidden ? "btn-soft" : "btn-ghost")} onClick={() => setState((s) => {
+            const set = new Set(s.settings.hiddenSubjects || []);
+            set.has(subjectId) ? set.delete(subjectId) : set.add(subjectId);
+            return { ...s, settings: { ...s.settings, hiddenSubjects: [...set] } };
+          })} style={{ fontSize: 12.5 }}>{hidden ? "已隐藏 · 点击显示" : "在日历中显示"}</button>
+          <button className="icon-btn" onClick={close}><Icon name="close" /></button>
+        </div>
+        <div className="modal-body">
+          {/* 总览 */}
+          <div className="rv-overview" style={{ background: subj.fill }}>
+            <Ring value={overallRatio} size={92} stroke={10} glow color={subj.solid}>
+              <div><div className="font-display tnum" style={{ fontSize: 26, fontWeight: 700, lineHeight: 1, color: subj.ink }}>{pct(overallRatio)}<small style={{ fontSize: 13 }}>%</small></div><div style={{ fontSize: 10, color: subj.ink, opacity: 0.7 }}>近4月完成率</div></div>
+            </Ring>
+            <div className="rv-kpis">
+              <div><b className="font-display tnum" style={{ color: subj.ink }}>{Drv.fmtHrs(totDone)}h</b><span>累计学习</span></div>
+              <div><b className="font-display tnum" style={{ color: subj.ink }}>{totTodoDone}/{totTodo}</b><span>待办完成</span></div>
+              <div><b className="font-display tnum" style={{ color: subj.ink }}>{totGoalH || "—"}{totGoalH ? "h" : ""}</b><span>目标合计</span></div>
+            </div>
+          </div>
+          <p style={{ fontSize: 12.5, color: "var(--ink-3)", margin: "0 2px 14px", lineHeight: 1.5 }}>
+            完成率口径 = 每日 to-do 清单完成数 ÷ 总数。以月为总体，可展开看每周明细。
+          </p>
+
+          {/* 逐月 */}
+          {review.map((m) => {
+            const isOpen = openMonth === m.monthKey;
+            const hasData = m.todoTotal > 0 || m.count > 0 || m.goalH > 0;
+            return (
+              <div key={m.monthKey} className={"rv-month" + (isOpen ? " open" : "")}>
+                <div className="rv-month-head" onClick={() => setOpenMonth(isOpen ? "" : m.monthKey)}>
+                  <Icon name={isOpen ? "prev" : "next"} size={14} />
+                  <span className="rv-month-name font-display">{monthLabel(m.monthKey)}</span>
+                  <div className="rv-month-bar">
+                    <i style={{ width: `${pct(m.ratio)}%`, background: subj.solid }} />
+                  </div>
+                  <span className="rv-month-pct tnum" style={{ color: ringColor(m.ratio) }}>{pct(m.ratio)}%</span>
+                  <span className="rv-month-fig tnum">{Drv.fmtHrs(m.doneMin)}h{m.goalH ? ` / ${m.goalH}h` : ""}</span>
+                </div>
+                {isOpen && (
+                  <div className="rv-weeks">
+                    <div className="rv-goalset">
+                      <span>本月目标</span>
+                      <input type="number" min="0" step="1" className="input tnum" style={{ width: 64, padding: "5px 8px", fontWeight: 700 }}
+                        value={m.goalH || ""} placeholder="—" onChange={(e) => setMonthGoal(m.monthKey, +e.target.value)} />
+                      <span>小时</span>
+                      {m.goalH > 0 && <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--ink-3)" }}>时长达成 {pct(Math.min(1, m.doneMin / 60 / m.goalH))}%</span>}
+                    </div>
+                    {!hasData && <div className="empty" style={{ padding: "16px" }}>这个月还没有该科目的记录</div>}
+                    {m.weeks.map((w, i) => {
+                      const wl = `${+w.weekStart.slice(5, 7)}/${+w.weekStart.slice(8)}`;
+                      const we = `${+w.to.slice(5, 7)}/${+w.to.slice(8)}`;
+                      const blank = w.todoTotal === 0 && w.count === 0;
+                      return (
+                        <div key={w.weekStart} className={"rv-week" + (blank ? " blank" : "")}>
+                          <span className="rv-week-label tnum">第{i + 1}周 <small>{wl}–{we}</small></span>
+                          <div className="rv-week-bar"><i style={{ width: `${pct(w.ratio)}%`, background: subj.line }} /><i style={{ width: `${pct(w.ratio)}%`, background: subj.solid, marginTop: -7 }} /></div>
+                          <span className="rv-week-pct tnum">{w.todoTotal ? pct(w.ratio) + "%" : "—"}</span>
+                          <span className="rv-week-fig tnum">{w.todoTotal ? `${w.todoDone}/${w.todoTotal}` : ""}{w.doneMin ? ` · ${Drv.fmtHrs(w.doneMin)}h` : ""}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </React.Fragment>
+  );
+}
+
+window.SubjectReviewModal = SubjectReviewModal;
+
+</script>
+  <script type="text/babel">
+/* ============ 备考日历 · 统计面板 ============ */
+const Ds = window.CalData;
+
+const GROUP_NOTE = { "法考": "客观题各科", "法学课程": "期末考课程", "保研": "" };
+
+/* ---- 概览（时长 + 完成，单周期） ---- */
+function OverviewPanel({ events, subjects, settings, anchor }) {
+  const [cycle, setCycle] = useState("week");
+  const [from, to, cycleLabel] = useMemo(() => {
+    if (cycle === "today") return [Ds.today(), Ds.today(), "今日"];
+    if (cycle === "week") { const s = Ds.startOfWeek(anchor); return [s, Ds.addDays(s, 6), "本周"]; }
+    if (cycle === "month") { return [Ds.startOfMonth(anchor), Ds.endOfMonth(anchor), "本月"]; }
+    if (cycle === "exam") {
+      const t = Ds.today(), ed = settings.examDate || Ds.addDays(t, 90);
+      return [t < ed ? t : ed, t < ed ? ed : t, "至考试"];
+    }
+    return ["0000-01-01", "9999-12-31", "全部"];
+  }, [cycle, anchor, settings.examDate]);
+
+  const { map, totPlanned, totDone, totTodo, totTodoDone } = useMemo(
+    () => Ds.rangeStats(events, subjects, from, to), [events, subjects, from, to]);
+  const rows = subjects.map((s) => ({ s, ...map[s.id] })).sort((a, b) => b.plannedMin - a.plannedMin);
+  const active = rows.filter((r) => r.plannedMin > 0 || r.count > 0);
+  const maxMin = Math.max(60, ...active.map((r) => r.plannedMin));
+  const days = Math.max(1, Ds.daysBetween(from, to) + 1);
+  const overallTodoRatio = totTodo ? totTodoDone / totTodo : 0;
+
+  return (
+    <React.Fragment>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+        <div className="cycle-seg">
+          {[["today", "今日"], ["week", "本周"], ["month", "本月"], ["exam", "至考试"], ["all", "全部"]].map(([k, l]) => (
+            <button key={k} className={cycle === k ? "on" : ""} onClick={() => setCycle(k)}>{l}</button>
+          ))}
+        </div>
+      </div>
+      <div className="stat-overview">
+        <Ring value={settings.dailyGoalMin ? Math.min(1, totDone / (settings.dailyGoalMin * days)) : overallTodoRatio}
+          size={108} stroke={11} glow color="var(--accent)">
+          <div>
+            <div className="font-display tnum" style={{ fontSize: 26, fontWeight: 700, lineHeight: 1 }}>{Ds.fmtHrs(totDone)}<small style={{ fontSize: 13 }}>h</small></div>
+            <div style={{ fontSize: 10.5, color: "var(--ink-2)", marginTop: 3 }}>已完成时长</div>
+          </div>
+        </Ring>
+        <div className="stat-kpis">
+          <div><div className="kpi-num tnum">{Ds.fmtHrs(totPlanned)}<small>h</small></div><div className="kpi-label">{cycleLabel}计划时长</div></div>
+          <div><div className="kpi-num tnum">{Math.round(overallTodoRatio * 100)}<small>%</small></div><div className="kpi-label">待办完成率 ({totTodoDone}/{totTodo})</div></div>
+          <div><div className="kpi-num tnum">{Ds.fmtHrs(days ? totDone / days : 0)}<small>h</small></div><div className="kpi-label">日均学习</div></div>
+        </div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "4px 4px 12px" }}>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink-3)", letterSpacing: 1 }}>各科目 · {cycleLabel}</div>
+        <div style={{ flex: 1, height: 1, background: "var(--line-2)" }} />
+        <div style={{ fontSize: 11.5, color: "var(--ink-3)", display: "flex", gap: 14 }}>
+          <span><i style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: "var(--ink-3)", marginRight: 4, verticalAlign: "middle" }} />计划时长</span>
+          <span>待办完成率</span>
+        </div>
+      </div>
+      {active.length === 0 && <div className="empty">这个周期还没有学习记录～<br />去日历上安排几个任务吧</div>}
+      {active.map((r) => {
+        const todoRatio = r.todoTotal ? r.todoDone / r.todoTotal : 0;
+        return (
+          <div className="subj-stat-row" key={r.s.id}>
+            <div className="subj-stat-name">
+              <span className="subj-dot" style={{ background: r.s.solid }} />
+              <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.s.name}</span>
+            </div>
+            <div className="subj-stat-bars">
+              <div className="sbar" title={`计划 ${Ds.fmtMin(r.plannedMin)} · 已完成 ${Ds.fmtMin(r.doneMin)}`}>
+                <i style={{ width: `${(r.plannedMin / maxMin) * 100}%`, background: r.s.line }} />
+                <i style={{ width: `${(r.doneMin / maxMin) * 100}%`, background: r.s.solid, marginTop: -9 }} />
+              </div>
+              <div className="sbar" title={`待办 ${r.todoDone}/${r.todoTotal}`}>
+                <i style={{ width: `${todoRatio * 100}%`, background: r.s.solid, opacity: 0.55 }} />
+              </div>
+            </div>
+            <div className="subj-stat-fig">
+              <div className="big tnum" style={{ color: r.s.ink }}>{Ds.fmtHrs(r.plannedMin)}h</div>
+              <div className="sm tnum">完成 {Math.round(todoRatio * 100)}% · {r.count}项</div>
+            </div>
+          </div>
+        );
+      })}
+    </React.Fragment>
+  );
+}
+
+/* ---- 完成率追踪：今日 / 本周 / 本月 三栏，按科目 + 分组汇总 ---- */
+function periodRange(kind) {
+  const t = Ds.today();
+  if (kind === "today") return [t, t];
+  if (kind === "week") { const s = Ds.startOfWeek(t); return [s, Ds.addDays(s, 6)]; }
+  return [Ds.startOfMonth(t), Ds.endOfMonth(t)];
+}
+
+function TrackCell({ done, total, color, today }) {
+  if (!total) {
+    return <div className="track-empty">{today ? <span>—<br /><small>未设清单</small></span> : "—"}</div>;
+  }
+  const ratio = done / total;
+  return (
+    <div className="track-cell">
+      <Ring value={ratio} size={36} stroke={4.5} color={ratio >= 1 ? "oklch(0.72 0.16 150)" : color}>
+        <span className="tnum" style={{ fontSize: 11, fontWeight: 700, color: "var(--ink)" }}>{Math.round(ratio * 100)}</span>
+      </Ring>
+      <span className="tc-frac">{done}/{total}</span>
+    </div>
+  );
+}
+
+function CompletionTracker({ events, subjects }) {
+  const periods = ["today", "week", "month"];
+  const maps = useMemo(() => {
+    const o = {};
+    periods.forEach((p) => { const [f, t] = periodRange(p); o[p] = Ds.rangeStats(events, subjects, f, t).map; });
+    return o;
+  }, [events, subjects]);
+
+  const groups = Ds.GROUP_ORDER.map((g) => [g, subjects.filter((s) => s.group === g)]);
+  const agg = (period, list) => {
+    let d = 0, tot = 0;
+    list.forEach((s) => { const m = maps[period][s.id]; d += m.todoDone; tot += m.todoTotal; });
+    return { d, tot };
+  };
+
+  return (
+    <React.Fragment>
+      <p style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.6, margin: "0 0 16px", background: "var(--surface-2)", padding: "12px 16px", borderRadius: "var(--r-md)" }}>
+        每个科目<b>待办清单 (to-do) 的完成比例</b> —— 今日告诉你清单设了没、完成了多少;本周、本月则汇总整段时间的完成率。
+        每组(法考 / 期末 / 保研)顶部为该组的整体完成率。
+      </p>
+      <div className="track-grid">
+        <div className="track-colhead">
+          <div>科目</div><div>今日</div><div>本周</div><div>本月</div>
+        </div>
+        {groups.map(([g, list]) => {
+          if (list.length === 0) return null;
+          return (
+            <div className="track-group" key={g}>
+              <div className="track-group-name">
+                <b>{g}</b>
+                {GROUP_NOTE[g] && <span className="gn-note">· {GROUP_NOTE[g]}</span>}
+                <span className="gn-line" />
+              </div>
+              <div className="track-grp-cell" style={{ display: "flex", alignItems: "center", fontSize: 12, color: "var(--ink-3)", fontWeight: 600 }}>整体完成率</div>
+              {periods.map((p) => {
+                const { d, tot } = agg(p, list);
+                const ratio = tot ? d / tot : 0;
+                return (
+                  <div className="track-grp-cell" key={p}>
+                    {tot ? (
+                      <div className="track-grpring">
+                        <Ring value={ratio} size={30} stroke={4} color={ratio >= 1 ? "oklch(0.72 0.16 150)" : "var(--accent)"}>
+                          <span className="tnum" style={{ fontSize: 10, fontWeight: 700 }}>{Math.round(ratio * 100)}</span>
+                        </Ring>
+                        <span className="tg-frac">{d}/{tot}</span>
+                      </div>
+                    ) : <div className="track-empty" style={{ minHeight: 30 }}>—</div>}
+                  </div>
+                );
+              })}
+              {list.map((s) => (
+                <div className="track-row" key={s.id}>
+                  <div className="track-name">
+                    <span className="subj-dot" style={{ background: s.solid }} />
+                    <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</span>
+                  </div>
+                  {periods.map((p) => {
+                    const m = maps[p][s.id];
+                    return <div key={p}><TrackCell done={m.todoDone} total={m.todoTotal} color={s.solid} today={p === "today"} /></div>;
+                  })}
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </React.Fragment>
+  );
+}
+
+function StatsModal({ events, subjects, settings, anchor, onClose }) {
+  const [show, setShow] = useState(false);
+  const [tab, setTab] = useState("overview"); // overview | tracker
+  useEffect(() => { const t = setTimeout(() => setShow(true), 10); return () => clearTimeout(t); }, []);
+  const close = () => { setShow(false); setTimeout(onClose, 280); };
+
+  return (
+    <React.Fragment>
+      <div className={"scrim" + (show ? " show" : "")} onClick={close} />
+      <div className={"modal" + (show ? " show" : "")}>
+        <div className="modal-head">
+          <Icon name="chart" size={22} />
+          <div className="modal-title">学习统计</div>
+          <div className="spacer" />
+          <div className="cycle-seg">
+            <button className={tab === "overview" ? "on" : ""} onClick={() => setTab("overview")}>时长 · 完成</button>
+            <button className={tab === "tracker" ? "on" : ""} onClick={() => setTab("tracker")}>完成率追踪</button>
+          </div>
+          <button className="icon-btn" onClick={close}><Icon name="close" /></button>
+        </div>
+        <div className="modal-body">
+          {tab === "overview"
+            ? <OverviewPanel events={events} subjects={subjects} settings={settings} anchor={anchor} />
+            : <CompletionTracker events={events} subjects={subjects} />}
+        </div>
+      </div>
+    </React.Fragment>
+  );
+}
+
+window.StatsModal = StatsModal;
+
+</script>
+  <script type="text/babel">
+/* ============ 备考日历 · AI 排课助手 ============ */
+const Dai = window.CalData;
+
+function parseJSONLoose(txt) {
+  if (!txt) return null;
+  let t = String(txt).trim();
+  t = t.replace(/^```(json)?/i, "").replace(/```$/, "").trim();
+  const i = t.indexOf("{"), j = t.lastIndexOf("}");
+  if (i >= 0 && j > i) t = t.slice(i, j + 1);
+  try { return JSON.parse(t); } catch (e) { return null; }
+}
+
+function buildSchedulePrompt(state, userText) {
+  const today = Dai.today();
+  const wd = "周" + Dai.DOW_CN[Dai.dow(today)];
+  const subjList = Dai.GROUP_ORDER.map((g) => `${g}：` + state.subjects.filter((s) => s.group === g).map((s) => s.name).join("、")).join("\n");
+  const evs = Dai.compactEvents(state, Dai.addDays(today, -7), Dai.addDays(today, 60));
+  return [
+    "你是一个中文法考/备考日历的排课助手。今天是 " + today + "（" + wd + "），一周从周一开始。",
+    "用户会用中文下达指令，你要把它转成对日程的增删改操作。",
+    "只输出一个 JSON 对象，不要任何解释、不要 markdown 代码块：",
+    '{"reply":"一句话中文说明你做了什么","actions":[ ... ]}',
+    "actions 数组中每个元素是以下三种之一：",
+    '· 新增：{"op":"create","date":"YYYY-MM-DD","subject":"科目名","title":"简短标题","start":"HH:MM"或null,"durationMin":整数分钟,"todos":["待办1","待办2"]}',
+    '· 修改：{"op":"update","id":"事件id","date?":"...","subject?":"...","title?":"...","start?":"...","durationMin?":整数,"done?":true/false,"todos?":["..."]}',
+    '· 删除：{"op":"delete","id":"事件id"}',
+    "可用科目（subject 必须用下列准确名称）：",
+    subjList,
+    "现有日程（格式 id|日期|科目|开始|时长|标题|todo 完成/总数）：",
+    evs.length ? evs.join("\n") : "（暂无）",
+    "规则：",
+    "1. 根据今天推断相对日期（明天/本周三/下周/这个周末等）。",
+    "2. 未指定时长默认 60 分钟；未指定时间则 start 用 null。",
+    "3. 跨多天的需求要拆成多条 create。",
+    "4. update/delete 只能用上面列出的真实 id，不要编造。",
+    "5. 标题用简洁中文，不要在标题里重复科目名（科目已单独标注）；可主动补充合理的 todos。",
+    "用户指令：" + JSON.stringify(userText),
+  ].join("\n");
+}
+
+/* 语音识别 hook */
+function useVoice(onText) {
+  const recRef = useRef(null);
+  const [listening, setListening] = useState(false);
+  const supported = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
+  const toggle = () => {
+    if (!supported) return;
+    if (listening) { recRef.current && recRef.current.stop(); return; }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const rec = new SR();
+    rec.lang = "zh-CN"; rec.interimResults = true; rec.continuous = false;
+    let finalT = "";
+    rec.onresult = (e) => {
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) finalT += r[0].transcript; else interim += r[0].transcript;
+      }
+      onText(finalT + interim);
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    recRef.current = rec;
+    try { rec.start(); setListening(true); } catch (e) { setListening(false); }
+  };
+  return { listening, toggle, supported: !!supported };
+}
+
+const QUICK = [
+  "把刑法这周一到周五排进去，每天晚上8点90分钟",
+  "明天上午加一节民法真题练习，2小时",
+  "这周末各加一节经济法保研论文研读",
+  "把今天没做完的任务挪到明天",
+];
+
+function AssistantPanel({ state, setState, onClose, toast }) {
+  const [show, setShow] = useState(false);
+  const [msgs, setMsgs] = useState([{ role: "ai", text: "我是你的排课助手 ✦ 直接说出或输入你的安排，我来改日历。比如：「把刑法这周每天晚上排90分钟」。" }]);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const bodyRef = useRef(null);
+  const { listening, toggle, supported } = useVoice(setInput);
+
+  useEffect(() => { const t = setTimeout(() => setShow(true), 10); return () => clearTimeout(t); }, []);
+  useEffect(() => { if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight; }, [msgs, busy]);
+  const close = () => { setShow(false); setTimeout(onClose, 280); };
+
+  const send = async (text) => {
+    const q = (text != null ? text : input).trim();
+    if (!q || busy) return;
+    setInput("");
+    setMsgs((m) => [...m, { role: "user", text: q }]);
+    setBusy(true);
+    if (!Dai.aiAvailable(state)) {
+      setMsgs((m) => [...m, { role: "ai", text: "⚠️ 还没接入 AI。请点右上角「设置」填入你的 Anthropic API Key，即可在任意浏览器里使用 AI 排课。", needKey: true }]);
+      setBusy(false); return;
+    }
+    try {
+      const prompt = buildSchedulePrompt(state, q);
+      const raw = await Dai.aiComplete(prompt, state.settings.apiKey);
+      const data = parseJSONLoose(raw);
+      if (!data || !Array.isArray(data.actions)) {
+        setMsgs((m) => [...m, { role: "ai", text: "我没太理解，换种说法再试一次？（比如指明科目、日期、时长）" }]);
+        setBusy(false); return;
+      }
+      const snapshot = state.events;
+      const { events, summary } = Dai.applyActions(state, data.actions);
+      setState((s) => ({ ...s, events }));
+      setMsgs((m) => [...m, { role: "ai", text: data.reply || "已更新日程", summary, undo: snapshot }]);
+      toast && toast(`已更新 ${summary.length} 项日程`);
+    } catch (e) {
+      setMsgs((m) => [...m, { role: "ai", text: "出错了：" + (e.message || e) + "，稍后再试。" }]);
+    }
+    setBusy(false);
+  };
+
+  const undo = (snapshot, idx) => {
+    setState((s) => ({ ...s, events: snapshot }));
+    setMsgs((m) => m.map((mm, i) => (i === idx ? { ...mm, undone: true } : mm)));
+    toast && toast("已撤销");
+  };
+
+  return (
+    <React.Fragment>
+      <div className={"scrim" + (show ? " show" : "")} onClick={close} style={{ background: "rgba(44,42,39,0.18)" }} />
+      <div className={"ai-panel" + (show ? " show" : "")}>
+        <div className="ai-head">
+          <div className="ai-mark"><Icon name="flame" size={16} /></div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700 }}>AI 排课助手</div>
+            <div style={{ fontSize: 11, color: "var(--ink-3)" }}>说一句话，我帮你改日历</div>
+          </div>
+          <button className="icon-btn" onClick={close}><Icon name="close" /></button>
+        </div>
+        <div className="ai-body" ref={bodyRef}>
+          {msgs.map((m, i) => (
+            <div key={i} className={"ai-msg " + m.role}>
+              <div className={"ai-bubble " + m.role}>
+                {m.text}
+                {m.summary && m.summary.length > 0 && !m.undone && (
+                  <div className="ai-changes">
+                    {m.summary.map((s, k) => (
+                      <div key={k} className={"ai-change " + s.op}>
+                        <span className="acd" />{s.text}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {m.undo && !m.undone && (
+                  <button className="ai-undo" onClick={() => undo(m.undo, i)}>↩ 撤销这次更改</button>
+                )}
+                {m.undone && <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 6 }}>已撤销</div>}
+              </div>
+            </div>
+          ))}
+          {busy && <div className="ai-msg ai"><div className="ai-bubble ai ai-typing"><i /><i /><i /></div></div>}
+        </div>
+        {msgs.length <= 1 && (
+          <div className="ai-quick">
+            {QUICK.map((q) => <button key={q} onClick={() => send(q)}>{q}</button>)}
+          </div>
+        )}
+        <div className="ai-input">
+          {supported && (
+            <button className={"ai-mic" + (listening ? " on" : "")} onClick={toggle} title="语音输入">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0" /><line x1="12" y1="19" x2="12" y2="22" />
+              </svg>
+            </button>
+          )}
+          <input value={input} placeholder={listening ? "聆听中…" : "输入指令，回车发送"} disabled={busy}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") send(); }} />
+          <button className="ai-send" onClick={() => send()} disabled={busy || !input.trim()}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+          </button>
+        </div>
+      </div>
+    </React.Fragment>
+  );
+}
+
+window.AssistantPanel = AssistantPanel;
+window.parseJSONLoose = parseJSONLoose;
+
+</script>
+  <script type="text/babel">
+/* ============ 备考日历 · 每周规划（按科目设大目标） ============ */
+const Dp = window.CalData;
+const WD_FULL = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+
+function GoalEditor({ subjects, hidden, goal, onChange, onRemove }) {
+  const subj = subjects.find((s) => s.id === goal.subjectId) || subjects[0];
+  const groups = Dp.GROUP_ORDER.map((g) => [g, subjects.filter((s) => s.group === g)]);
+  const todoText = (goal.dailyTodos || []).join("\n");
+  return (
+    <div className="goal-card" style={{ borderLeft: `4px solid ${subj.solid}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        <span className="subj-dot" style={{ background: subj.solid, width: 15, height: 15 }} />
+        <select className="input" style={{ width: "auto", flex: 1, padding: "7px 11px", fontWeight: 600 }}
+          value={goal.subjectId} onChange={(e) => onChange({ ...goal, subjectId: e.target.value })}>
+          {groups.map(([g, list]) => (
+            <optgroup key={g} label={g}>
+              {list.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </optgroup>
+          ))}
+        </select>
+        <button className="icon-btn" onClick={onRemove}><Icon name="trash" size={15} /></button>
+      </div>
+      <div className="row" style={{ gap: 14, alignItems: "flex-end" }}>
+        <div style={{ flex: "0 0 auto" }}>
+          <label className="field-label" style={{ marginBottom: 5 }}>本周目标时长</label>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+            <input type="number" min="1" max="60" step="0.5" className="input tnum"
+              style={{ width: 76, fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, padding: "6px 10px" }}
+              value={goal.goalHours} onChange={(e) => onChange({ ...goal, goalHours: +e.target.value })} />
+            <span style={{ fontSize: 14, color: "var(--ink-2)", fontWeight: 600 }}>小时</span>
+          </div>
+        </div>
+        <div style={{ flex: 1 }}>
+          <label className="field-label" style={{ marginBottom: 5 }}>安排在这些天</label>
+          <div className="wd-pick">
+            {WD_FULL.map((w, i) => (
+              <button key={i} className={(goal.weekdays || []).includes(i) ? "on" : ""}
+                onClick={() => {
+                  const set = new Set(goal.weekdays || []);
+                  set.has(i) ? set.delete(i) : set.add(i);
+                  onChange({ ...goal, weekdays: [...set].sort() });
+                }} style={(goal.weekdays || []).includes(i) ? { background: subj.solid, color: "#fff" } : null}>{w[1]}</button>
+            ))}
+          </div>
+        </div>
+        <div style={{ flex: "0 0 auto" }}>
+          <label className="field-label" style={{ marginBottom: 5 }}>每天开始</label>
+          <input type="time" className="input tnum" style={{ width: 110, padding: "7px 10px" }}
+            value={goal.startTime || ""} onChange={(e) => onChange({ ...goal, startTime: e.target.value || null })} />
+        </div>
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <label className="field-label" style={{ marginBottom: 5 }}>每日待办模板（每行一条，会预设进每天的 to-do）</label>
+        <textarea className="input" style={{ minHeight: 52, fontSize: 13.5 }} placeholder={"看课 1 节\n真题 30 道\n错题整理"}
+          value={todoText} onChange={(e) => onChange({ ...goal, dailyTodos: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })} />
+      </div>
+      {(goal.weekdays || []).length > 0 && goal.goalHours > 0 && (
+        <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 8 }}>
+          → 生成 {goal.weekdays.length} 天，每天约 <b style={{ color: subj.ink }}>{Dp.fmtMin(Math.round(goal.goalHours * 60 / goal.weekdays.length))}</b>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WeeklyPlanner({ state, setState, onClose, toast, initialWeek }) {
+  const [show, setShow] = useState(false);
+  const [week, setWeek] = useState(initialWeek || Dp.weekKey(Dp.today()));
+  const [goals, setGoals] = useState(() => (state.weeklyPlans[week] || []).map((g) => ({ ...g })));
+  useEffect(() => { const t = setTimeout(() => setShow(true), 10); return () => clearTimeout(t); }, []);
+  useEffect(() => { setGoals((state.weeklyPlans[week] || []).map((g) => ({ ...g }))); }, [week]);
+  const close = () => { setShow(false); setTimeout(onClose, 280); };
+
+  const weekEnd = Dp.addDays(week, 6);
+  const label = `${(+week.slice(5, 7))}月${(+week.slice(8))}日 – ${(+weekEnd.slice(5, 7))}月${(+weekEnd.slice(8))}日`;
+  const visibleSubjects = state.subjects;
+  const hidden = state.settings.hiddenSubjects || [];
+
+  const addGoal = () => {
+    const used = new Set(goals.map((g) => g.subjectId));
+    const s = state.subjects.find((x) => !used.has(x.id)) || state.subjects[0];
+    setGoals((g) => [...g, { id: Dp.uid("g"), subjectId: s.id, goalHours: 10, weekdays: [0, 1, 2, 3, 4], startTime: "20:00", dailyTodos: [] }]);
+  };
+  const savePlan = (next) => {
+    setGoals(next);
+    setState((st) => ({ ...st, weeklyPlans: { ...st.weeklyPlans, [week]: next } }));
+  };
+  const updateGoal = (id, g) => savePlan(goals.map((x) => (x.id === id ? g : x)));
+  const removeGoal = (id) => savePlan(goals.filter((x) => x.id !== id));
+
+  const generate = () => {
+    savePlan(goals);
+    let created = 0;
+    setState((st) => {
+      let events = st.events.slice();
+      // 移除本周由规划生成的旧事件（标记 planId），避免重复
+      events = events.filter((e) => !(e.planWeek === week));
+      goals.forEach((g) => {
+        const days = (g.weekdays || []);
+        if (!days.length || !g.goalHours) return;
+        const per = Math.max(15, Math.round(g.goalHours * 60 / days.length));
+        const subj = st.subjects.find((s) => s.id === g.subjectId);
+        days.forEach((wd) => {
+          const date = Dp.addDays(week, wd);
+          events.push({
+            id: Dp.uid("e"), date, subjectId: g.subjectId,
+            title: `${subj.name} · 周目标`, start: g.startTime || null, durationMin: per,
+            done: false, notes: "", planWeek: week,
+            todos: (g.dailyTodos || []).map((t) => ({ id: Dp.uid("t"), text: t, done: false })),
+          });
+          created++;
+        });
+      });
+      return { ...st, events };
+    });
+    toast && toast(`已生成 ${created} 个学习块`);
+  };
+
+  const progress = useMemo(() => {
+    const { map } = Dp.rangeStats(state.events, state.subjects, week, weekEnd);
+    return goals.map((g) => {
+      const m = map[g.subjectId] || { plannedMin: 0, doneMin: 0 };
+      return { g, goalMin: Math.round(g.goalHours * 60), planned: m.plannedMin, done: m.doneMin };
+    });
+  }, [goals, state.events, week]);
+
+  return (
+    <React.Fragment>
+      <div className={"scrim" + (show ? " show" : "")} onClick={close} />
+      <div className={"modal" + (show ? " show" : "")} style={{ width: 760 }}>
+        <div className="modal-head">
+          <Icon name="target" size={22} />
+          <div className="modal-title">每周规划</div>
+          <div className="nav-group" style={{ marginLeft: 6 }}>
+            <button className="icon-btn" onClick={() => setWeek(Dp.addDays(week, -7))}><Icon name="prev" size={16} /></button>
+            <span className="tnum" style={{ fontSize: 13.5, fontWeight: 600, minWidth: 132, textAlign: "center" }}>{label}</span>
+            <button className="icon-btn" onClick={() => setWeek(Dp.addDays(week, 7))}><Icon name="next" size={16} /></button>
+          </div>
+          <div className="spacer" />
+          <button className="icon-btn" onClick={close}><Icon name="close" /></button>
+        </div>
+        <div className="modal-body">
+          <p style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.6, margin: "0 0 16px" }}>
+            为本周挑选科目并设定<b>大目标时长</b>（如：刑法 20 小时）。点「生成本周日程」后会自动把时长拆到选定的每天、并预设好待办；这些时长会<b>自动汇总到周/月统计与分析报告</b>。
+          </p>
+          {goals.length === 0 && <div className="empty" style={{ padding: "26px" }}>本周还没有规划目标<br />点下面「添加科目目标」开始</div>}
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {goals.map((g) => (
+              <GoalEditor key={g.id} subjects={visibleSubjects} hidden={hidden} goal={g}
+                onChange={(ng) => updateGoal(g.id, ng)} onRemove={() => removeGoal(g.id)} />
+            ))}
+          </div>
+          <button className="btn btn-soft" style={{ marginTop: 14 }} onClick={addGoal}><Icon name="plus" size={15} /> 添加科目目标</button>
+
+          {progress.length > 0 && (
+            <React.Fragment>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink-3)", letterSpacing: 1, margin: "22px 2px 10px" }}>本周目标进度</div>
+              {progress.map(({ g, goalMin, planned, done }) => {
+                const subj = state.subjects.find((s) => s.id === g.subjectId);
+                const planRatio = goalMin ? Math.min(1, planned / goalMin) : 0;
+                const doneRatio = goalMin ? Math.min(1, done / goalMin) : 0;
+                return (
+                  <div className="subj-stat-row" key={g.id} style={{ gridTemplateColumns: "120px 1fr auto" }}>
+                    <div className="subj-stat-name"><span className="subj-dot" style={{ background: subj.solid }} />{subj.name}</div>
+                    <div className="sbar" title={`目标 ${Dp.fmtHrs(goalMin)}h · 已排 ${Dp.fmtHrs(planned)}h · 已完成 ${Dp.fmtHrs(done)}h`}>
+                      <i style={{ width: `${planRatio * 100}%`, background: subj.line }} />
+                      <i style={{ width: `${doneRatio * 100}%`, background: subj.solid, marginTop: -9 }} />
+                    </div>
+                    <div className="subj-stat-fig"><div className="big tnum" style={{ color: subj.ink }}>{Dp.fmtHrs(done)}/{Dp.fmtHrs(goalMin)}h</div><div className="sm">目标完成 {Math.round(doneRatio * 100)}%</div></div>
+                  </div>
+                );
+              })}
+            </React.Fragment>
+          )}
+        </div>
+        <div className="drawer-foot" style={{ borderTop: "1px solid var(--line)" }}>
+          <span style={{ fontSize: 12, color: "var(--ink-3)" }}>生成会覆盖本周由规划创建的旧学习块</span>
+          <div className="spacer" />
+          <button className="btn btn-soft" onClick={close}>关闭</button>
+          <button className="btn btn-accent" onClick={generate} disabled={!goals.length}><Icon name="check" size={15} stroke={2.6} /> 生成本周日程</button>
+        </div>
+      </div>
+    </React.Fragment>
+  );
+}
+
+window.WeeklyPlanner = WeeklyPlanner;
+
+</script>
+  <script type="text/babel">
+/* ============ 备考日历 · AI 学习分析报告（周/月 → PDF） ============ */
+/* F5 科目可增删改 · F6 月总目标拆分为子项，逐项设定时长并分析 */
+const Dr = window.CalData;
+
+function gatherReport(state, mode, anchor) {
+  let from, to, label, key, store;
+  if (mode === "month") { from = Dr.startOfMonth(anchor); to = Dr.endOfMonth(anchor); label = "本月"; key = Dr.monthKey(anchor); store = "monthlyGoals"; }
+  else { from = Dr.weekKey(anchor); to = Dr.addDays(from, 6); label = "本周"; key = Dr.weekKey(anchor); store = "weeklyGoals"; }
+  const { map } = Dr.rangeStats(state.events, state.subjects, from, to);
+  const days = [];
+  const n = Dr.daysBetween(from, to) + 1;
+  for (let i = 0; i < n; i++) {
+    const d = Dr.addDays(from, i);
+    const ds = Dr.dayStats(state.events, d, state.settings.dailyGoalMin);
+    days.push({ date: d, planned: ds.planned, done: ds.doneMin });
+  }
+  return { from, to, label, key, store, map, days };
+}
+
+// 真实数据（按科目）：已学时长 / 待办完成率（来自每日 to-do）
+function realFor(map, row) {
+  if (row.subjectId && map[row.subjectId]) {
+    const m = map[row.subjectId];
+    return { doneMin: m.doneMin, plannedMin: m.plannedMin, todoDone: m.todoDone, todoTotal: m.todoTotal,
+      todoRatio: m.todoTotal ? m.todoDone / m.todoTotal : 0 };
+  }
+  return { doneMin: 0, plannedMin: 0, todoDone: 0, todoTotal: 0, todoRatio: 0 };
+}
+
+// 根据已存目标 + 实际数据，构建可编辑目标行
+function buildGoalRows(state, gathered) {
+  const stored = (state[gathered.store] || {})[gathered.key];
+  if (stored && stored.length) return stored.map(cloneRow);
+  // 首次：用有数据的科目预填，子项留空，总目标按实际取整估值
+  const rows = [];
+  state.subjects.forEach((s) => {
+    const m = gathered.map[s.id];
+    if (m && (m.plannedMin > 0 || m.count > 0)) {
+      rows.push({ id: Dr.uid("g"), subjectId: s.id, name: s.name,
+        totalHours: Math.max(1, Math.round(m.plannedMin / 60)), subItems: [] });
+    }
+  });
+  return rows;
+}
+function cloneRow(r) { return { ...r, subItems: (r.subItems || []).map((x) => ({ ...x })) }; }
+
+function subItemDone(row) { return (row.subItems || []).reduce((a, x) => a + (+x.done || 0), 0); }
+function subItemTarget(row) { return (row.subItems || []).reduce((a, x) => a + (+x.hours || 0), 0); }
+
+// 本地兜底分析（无 AI 时）
+function localAnalyze(rows, map, days, label) {
+  let totTarget = 0, totDone = 0;
+  const subjects = rows.map((r) => {
+    const real = realFor(map, r);
+    const target = r.totalHours || subItemTarget(r) || 0;
+    const done = (r.subItems && r.subItems.length) ? subItemDone(r) : real.doneMin / 60;
+    totTarget += target; totDone += done;
+    const ratio = target ? Math.min(1, done / target) : 0;
+    const subItems = (r.subItems || []).map((si) => {
+      const sr = si.hours ? Math.min(1, (+si.done || 0) / si.hours) : 0;
+      let c;
+      if (sr >= 1) c = "已达成";
+      else if (sr >= 0.5) c = `进行中（${Math.round(sr * 100)}%），继续推进`;
+      else if (+si.done > 0) c = `刚起步（${Math.round(sr * 100)}%），需加力`;
+      else c = "尚未开始，优先安排";
+      return { name: si.name, comment: c };
+    });
+    let c;
+    if (ratio >= 1) c = `已达成 ${target}h 目标，待办完成率 ${Math.round(real.todoRatio * 100)}%。`;
+    else c = `目标 ${target}h，已完成 ${done.toFixed(1)}h（${Math.round(ratio * 100)}%），待办完成 ${Math.round(real.todoRatio * 100)}%。`;
+    return { name: r.name, comment: c, subItems };
+  });
+  const activeDays = days.filter((d) => d.done > 0).length;
+  const overallRatio = totTarget ? Math.min(1, totDone / totTarget) : 0;
+  const score = Math.round(Math.min(100, overallRatio * 60 + (activeDays / Math.max(1, days.length)) * 40));
+  const wins = [], risks = [], suggestions = [];
+  if (overallRatio >= 0.7) wins.push(`目标整体达成 ${Math.round(overallRatio * 100)}%，执行到位`);
+  if (activeDays >= days.length * 0.7) wins.push(`${days.length} 天中 ${activeDays} 天有推进`);
+  rows.forEach((r) => {
+    const target = r.totalHours || subItemTarget(r);
+    const done = (r.subItems && r.subItems.length) ? subItemDone(r) : realFor(map, r).doneMin / 60;
+    if (target && done < target * 0.6) risks.push(`${r.name} 距 ${target}h 目标还差 ${(target - done).toFixed(1)}h`);
+    (r.subItems || []).forEach((si) => { if (si.hours && (+si.done || 0) < si.hours * 0.4) risks.push(`${r.name}·${si.name} 进度偏慢`); });
+  });
+  if (days.length - activeDays > 0) suggestions.push(`有 ${days.length - activeDays} 天空白，下阶段保持每天都有推进`);
+  suggestions.push("把落后子项拆成更小的每日待办，交给 AI 排进日历");
+  suggestions.push("达成快的子项可适当压缩，把时间让给薄弱子项");
+  return {
+    headline: score >= 75 ? "本阶段执行得不错，继续保持" : score >= 50 ? "完成了一部分，仍有空间" : "进度偏慢，需要收紧节奏",
+    score, overall: `${label}设定目标合计 ${totTarget.toFixed(1)}h、已完成 ${totDone.toFixed(1)}h（${Math.round(overallRatio * 100)}%）；${days.length} 天中 ${activeDays} 天有效推进。`,
+    subjects, wins: wins.length ? wins : ["保持了基本学习投入"], risks: risks.length ? risks : ["暂无明显风险，注意持续性"], suggestions,
+  };
+}
+
+function buildReportPrompt(rows, map, days, label, from, to) {
+  const lines = rows.map((r) => {
+    const real = realFor(map, r);
+    const target = r.totalHours || subItemTarget(r);
+    const subs = (r.subItems || []).map((si) => `  - 子项「${si.name}」目标${si.hours}h，已完成${si.done || 0}h`).join("\n");
+    return `科目「${r.name}」总目标${target}h，实际学习${Dr.fmtHrs(real.doneMin)}h，待办完成${real.todoDone}/${real.todoTotal}` + (subs ? "\n" + subs : "（未拆子项）");
+  });
+  const dayLine = days.map((d) => `${d.date.slice(5)}:${Math.round(d.done / 60 * 10) / 10}h`).join(" ");
+  return [
+    "你是备考学习教练。基于下面的" + label + "学习数据做简洁、具体、鼓励但诚实的中文分析。",
+    "重点：要对每个科目的【各个子项】分别点评，而不是只给科目一个笼统结论。",
+    "只输出 JSON，不要 markdown：",
+    '{"headline":"一句话总评","score":0到100整数,"overall":"2-3句整体分析","subjects":[{"name":"科目名","comment":"结合目标与实际的1句点评","subItems":[{"name":"子项名","comment":"针对该子项进度的简短点评"}]}],"wins":["亮点"],"risks":["风险/落后点"],"suggestions":["下阶段具体建议"]}',
+    "时间范围：" + from + " 至 " + to,
+    "数据：", lines.join("\n"),
+    "每日完成时长：" + dayLine,
+    "subjects 覆盖下列所有科目与子项。每条点评不超过 28 字。",
+  ].join("\n");
+}
+
+const SUBITEM_PRESETS = ["看课", "精读法条", "背诵记忆", "真题练习", "错题整理", "案例分析", "模拟测试", "笔记总结"];
+
+/* ---------- 目标行编辑卡 ---------- */
+function GoalRow({ row, subjects, usedSubjectIds, realDone, onChange, onRemove }) {
+  const subj = row.subjectId ? subjects.find((s) => s.id === row.subjectId) : null;
+  const color = subj ? subj.solid : "var(--ink-3)";
+  const groups = Dr.GROUP_ORDER.map((g) => [g, subjects.filter((s) => s.group === g)]);
+  const sumTarget = subItemTarget(row);
+  const sumDone = subItemDone(row);
+
+  const setSub = (id, p) => onChange({ ...row, subItems: row.subItems.map((x) => (x.id === id ? { ...x, ...p } : x)) });
+  const addSub = () => {
+    const used = (row.subItems || []).map((x) => x.name);
+    const preset = SUBITEM_PRESETS.find((p) => !used.includes(p)) || "新子项";
+    onChange({ ...row, subItems: [...(row.subItems || []), { id: Dr.uid("si"), name: preset, hours: 2, done: 0 }] });
+  };
+  const delSub = (id) => onChange({ ...row, subItems: row.subItems.filter((x) => x.id !== id) });
+
+  return (
+    <div className="goal-card" style={{ borderLeft: `4px solid ${color}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span className="subj-dot" style={{ background: color, width: 14, height: 14, flexShrink: 0 }} />
+        <select className="input" style={{ width: "auto", flex: 1, padding: "7px 10px", fontWeight: 600 }}
+          value={row.subjectId || "__custom"}
+          onChange={(e) => {
+            if (e.target.value === "__custom") onChange({ ...row, subjectId: null });
+            else { const s = subjects.find((x) => x.id === e.target.value); onChange({ ...row, subjectId: s.id, name: s.name }); }
+          }}>
+          {groups.map(([g, list]) => (
+            <optgroup key={g} label={g}>
+              {list.map((s) => <option key={s.id} value={s.id} disabled={usedSubjectIds.includes(s.id) && s.id !== row.subjectId}>{s.name}</option>)}
+            </optgroup>
+          ))}
+          <option value="__custom">＋ 自定义科目…</option>
+        </select>
+        {!row.subjectId && (
+          <input className="input" style={{ flex: 1, fontWeight: 600 }} value={row.name} placeholder="自定义科目名"
+            onChange={(e) => onChange({ ...row, name: e.target.value })} />
+        )}
+        <div style={{ display: "flex", alignItems: "baseline", gap: 3, flexShrink: 0 }}>
+          <span style={{ fontSize: 12, color: "var(--ink-2)" }}>月总目标</span>
+          <input type="number" min="0" step="1" className="input tnum" style={{ width: 58, padding: "6px 8px", fontWeight: 700, fontFamily: "var(--font-display)", fontSize: 16 }}
+            value={row.totalHours != null ? row.totalHours : ""} onChange={(e) => onChange({ ...row, totalHours: +e.target.value })} />
+          <span style={{ fontSize: 12, color: "var(--ink-2)" }}>h</span>
+        </div>
+        <button className="icon-btn" onClick={onRemove} style={{ color: "oklch(0.62 0.16 25)", flexShrink: 0 }}><Icon name="trash" size={15} /></button>
+      </div>
+
+      {/* 子项 */}
+      <div className="subitem-wrap">
+        {(row.subItems || []).length > 0 && (
+          <div className="subitem-head">
+            <span style={{ flex: 1 }}>子项</span><span style={{ width: 96, textAlign: "center" }}>目标 / 已完成 (h)</span><span style={{ width: 28 }} />
+          </div>
+        )}
+        {(row.subItems || []).map((si) => (
+          <div className="subitem-row" key={si.id}>
+            <input className="subitem-name" value={si.name} placeholder="子项名称"
+              onChange={(e) => setSub(si.id, { name: e.target.value })} />
+            <div className="subitem-nums">
+              <input type="number" min="0" step="0.5" className="input tnum" value={si.hours != null ? si.hours : ""}
+                onChange={(e) => setSub(si.id, { hours: +e.target.value })} />
+              <span>/</span>
+              <input type="number" min="0" step="0.5" className="input tnum" value={si.done != null ? si.done : ""}
+                onChange={(e) => setSub(si.id, { done: +e.target.value })} />
+            </div>
+            <button className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => delSub(si.id)}><Icon name="close" size={13} /></button>
+          </div>
+        ))}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 7 }}>
+          <button className="subitem-add" onClick={addSub}><Icon name="plus" size={13} stroke={2.4} /> 拆分子项</button>
+          {sumTarget > 0 && (
+            <span style={{ fontSize: 11.5, color: sumTarget > (row.totalHours || 0) ? "oklch(0.62 0.15 30)" : "var(--ink-3)" }}>
+              子项合计 {sumTarget}h{row.totalHours ? ` / 总目标 ${row.totalHours}h` : ""} · 已完成 {sumDone}h
+            </span>
+          )}
+          {sumTarget === 0 && <span style={{ fontSize: 11.5, color: "var(--ink-3)" }}>已学 {Dr.fmtHrs(realDone)}h（来自日历实际）</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReportModal({ state, setState, onClose, anchor, toast }) {
+  const [show, setShow] = useState(false);
+  const [mode, setMode] = useState("month");
+  const [step, setStep] = useState("goals");
+  const [gathered, setGathered] = useState(() => gatherReport(state, "month", anchor));
+  const [rows, setRows] = useState(() => buildGoalRows(state, gatherReport(state, "month", anchor)));
+  const [analysis, setAnalysis] = useState(null);
+  const [aiNote, setAiNote] = useState("");
+
+  useEffect(() => { const t = setTimeout(() => setShow(true), 10); return () => clearTimeout(t); }, []);
+  const close = () => { setShow(false); setTimeout(onClose, 280); };
+
+  useEffect(() => {
+    const g = gatherReport(state, mode, anchor);
+    setGathered(g);
+    setRows(buildGoalRows(state, g));
+    setStep("goals"); setAnalysis(null);
+  }, [mode]);
+
+  // 保存目标到 state（持久）
+  const persistRows = (next) => {
+    setRows(next);
+    setState((s) => {
+      const store = { ...(s[gathered.store] || {}) };
+      store[gathered.key] = next;
+      return { ...s, [gathered.store]: store };
+    });
+  };
+  const updateRow = (id, r) => persistRows(rows.map((x) => (x.id === id ? r : x)));
+  const removeRow = (id) => persistRows(rows.filter((x) => x.id !== id));
+  const addRow = () => {
+    const used = rows.map((r) => r.subjectId).filter(Boolean);
+    const s = state.subjects.find((x) => !used.includes(x.id));
+    persistRows([...rows, s
+      ? { id: Dr.uid("g"), subjectId: s.id, name: s.name, totalHours: 10, subItems: [] }
+      : { id: Dr.uid("g"), subjectId: null, name: "", totalHours: 10, subItems: [] }]);
+  };
+
+  const runAnalysis = async () => {
+    setStep("loading");
+    let result = null, note = "";
+    if (Dr.aiAvailable(state)) {
+      try {
+        const raw = await Dr.aiComplete(buildReportPrompt(rows, gathered.map, gathered.days, gathered.label, gathered.from, gathered.to), state.settings.apiKey);
+        result = window.parseJSONLoose(raw);
+        if (!result || !result.subjects) { result = null; note = "AI 返回异常，已用本地分析。"; }
+      } catch (e) { note = "AI 暂不可用（" + String(e.message || e).slice(0, 40) + "），已用本地分析。"; }
+    } else {
+      note = "未接入 AI（设置里填 API Key 即可启用），当前为本地智能分析。";
+    }
+    if (!result) result = localAnalyze(rows, gathered.map, gathered.days, gathered.label);
+    setAnalysis(result); setAiNote(note); setStep("report");
+  };
+
+  const printReport = () => {
+    document.body.classList.add("printing-report");
+    window.print();
+    setTimeout(() => document.body.classList.remove("printing-report"), 500);
+  };
+
+  const usedSubjectIds = rows.map((r) => r.subjectId).filter(Boolean);
+  const activeDays = gathered.days.filter((d) => d.done > 0).length;
+  const totTarget = rows.reduce((a, r) => a + (r.totalHours || subItemTarget(r) || 0), 0);
+  const totDone = rows.reduce((a, r) => a + ((r.subItems && r.subItems.length) ? subItemDone(r) : realFor(gathered.map, r).doneMin / 60), 0);
+
+  return (
+    <React.Fragment>
+      <div className={"scrim" + (show ? " show" : "")} onClick={close} />
+      <div className={"modal" + (show ? " show" : "")} style={{ width: 860 }}>
+        <div className="modal-head no-print">
+          <Icon name="book" size={20} />
+          <div className="modal-title">学习分析报告</div>
+          <div className="cycle-seg" style={{ marginLeft: 8 }}>
+            <button className={mode === "week" ? "on" : ""} onClick={() => setMode("week")}>周报</button>
+            <button className={mode === "month" ? "on" : ""} onClick={() => setMode("month")}>月报</button>
+          </div>
+          <div className="spacer" />
+          {step === "report" && <button className="btn btn-soft" onClick={printReport}><Icon name="download" size={15} /> 存为 PDF</button>}
+          {step === "report" && <button className="btn btn-ghost" onClick={() => setStep("goals")}><Icon name="target" size={15} /> 改目标</button>}
+          <button className="icon-btn" onClick={close}><Icon name="close" /></button>
+        </div>
+
+        <div className="modal-body">
+          {step === "goals" && (
+            <div className="no-print">
+              <p style={{ fontSize: 13.5, color: "var(--ink-2)", lineHeight: 1.6, margin: "0 0 6px" }}>
+                生成{gathered.label}报告前，先设定<b>目标</b>：每个科目设一个总目标，再<b>拆成几个子项</b>分别填目标时长与已完成（AI 会逐项分析）。科目可自由增删改。
+              </p>
+              <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 14 }}>{gathered.from} 至 {gathered.to} · 设定会自动保存</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {rows.map((r) => (
+                  <GoalRow key={r.id} row={r} subjects={state.subjects} usedSubjectIds={usedSubjectIds}
+                    realDone={realFor(gathered.map, r).doneMin / 60}
+                    onChange={(nr) => updateRow(r.id, nr)} onRemove={() => removeRow(r.id)} />
+                ))}
+              </div>
+              <button className="btn btn-soft" style={{ marginTop: 14 }} onClick={addRow}><Icon name="plus" size={15} /> 添加科目</button>
+            </div>
+          )}
+
+          {step === "loading" && (
+            <div style={{ textAlign: "center", padding: "60px 0" }}>
+              <div className="ai-typing" style={{ justifyContent: "center", marginBottom: 16 }}><i /><i /><i /></div>
+              <div style={{ color: "var(--ink-2)", fontSize: 14 }}>AI 正在逐项分析你的{gathered.label}学习数据…</div>
+            </div>
+          )}
+
+          {step === "report" && analysis && (
+            <div className="report-sheet">
+              <div className="rep-header">
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="rep-kicker">备考日历 · {gathered.label}学习分析报告</div>
+                  <div className="rep-title font-display">{analysis.headline}</div>
+                  <div className="rep-range tnum">{gathered.from} 至 {gathered.to}</div>
+                </div>
+                <div className="rep-score">
+                  <Ring value={(analysis.score || 0) / 100} size={92} stroke={10} glow
+                    color={analysis.score >= 75 ? "oklch(0.72 0.16 150)" : analysis.score >= 50 ? "var(--accent)" : "oklch(0.7 0.16 30)"}>
+                    <div><div className="font-display tnum" style={{ fontSize: 28, fontWeight: 700, lineHeight: 1 }}>{analysis.score}</div><div style={{ fontSize: 10, color: "var(--ink-2)" }}>表现分</div></div>
+                  </Ring>
+                </div>
+              </div>
+
+              <div className="rep-kpis">
+                <div><b className="font-display tnum">{totDone.toFixed(1)}h</b><span>已完成时长</span></div>
+                <div><b className="font-display tnum">{totTarget.toFixed(0)}h</b><span>目标合计</span></div>
+                <div><b className="font-display tnum">{totTarget ? Math.round(Math.min(1, totDone / totTarget) * 100) : 0}%</b><span>目标达成率</span></div>
+                <div><b className="font-display tnum">{activeDays}/{gathered.days.length}</b><span>有效学习天</span></div>
+              </div>
+
+              <div className="rep-section"><h4>整体概览</h4><p>{analysis.overall}</p></div>
+
+              <div className="rep-section">
+                <h4>各科目 · 目标拆解与逐项分析</h4>
+                {rows.map((r) => {
+                  const subj = r.subjectId ? state.subjects.find((s) => s.id === r.subjectId) : null;
+                  const color = subj ? subj.solid : "var(--ink-3)";
+                  const line = subj ? subj.line : "var(--line)";
+                  const ai = (analysis.subjects || []).find((x) => x.name === r.name || (x.name && r.name.includes(x.name)));
+                  const target = r.totalHours || subItemTarget(r);
+                  const done = (r.subItems && r.subItems.length) ? subItemDone(r) : realFor(gathered.map, r).doneMin / 60;
+                  const ratio = target ? Math.min(1, done / target) : 0;
+                  return (
+                    <div className="rep-subj" key={r.id}>
+                      <div className="rep-subj-top">
+                        <span className="subj-dot" style={{ background: color }} /><b>{r.name || "未命名"}</b>
+                        <span className="rep-subj-fig tnum">{done.toFixed(1)}h / 目标 {target || "—"}h · {Math.round(ratio * 100)}%</span>
+                      </div>
+                      <div className="sbar" style={{ margin: "4px 0 6px" }}>
+                        <i style={{ width: `100%`, background: line, opacity: 0.4 }} />
+                        <i style={{ width: `${ratio * 100}%`, background: color, marginTop: -9 }} />
+                      </div>
+                      {ai && ai.comment && <p className="rep-subj-comment">{ai.comment}</p>}
+                      {(r.subItems || []).length > 0 && (
+                        <div className="rep-subitems">
+                          {r.subItems.map((si) => {
+                            const sr = si.hours ? Math.min(1, (+si.done || 0) / si.hours) : 0;
+                            const sai = ai && ai.subItems && ai.subItems.find((x) => x.name === si.name || (x.name && si.name.includes(x.name)));
+                            return (
+                              <div className="rep-subitem" key={si.id}>
+                                <span className="rep-si-name">{si.name}</span>
+                                <div className="rep-si-bar"><i style={{ width: `${sr * 100}%`, background: color }} /></div>
+                                <span className="rep-si-fig tnum">{si.done || 0}/{si.hours}h</span>
+                                <span className="rep-si-pct tnum" style={{ color: sr >= 1 ? "oklch(0.6 0.15 150)" : "var(--ink-2)" }}>{Math.round(sr * 100)}%</span>
+                                {sai && <span className="rep-si-comment">· {sai.comment}</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="rep-cols">
+                <div className="rep-section"><h4>✦ 亮点</h4><ul>{(analysis.wins || []).map((w, i) => <li key={i}>{w}</li>)}</ul></div>
+                <div className="rep-section"><h4>⚠ 风险 / 落后</h4><ul>{(analysis.risks || []).map((w, i) => <li key={i}>{w}</li>)}</ul></div>
+              </div>
+
+              <div className="rep-section rep-suggest"><h4>下阶段建议</h4><ol>{(analysis.suggestions || []).map((w, i) => <li key={i}>{w}</li>)}</ol></div>
+              <div className="rep-foot">由 备考日历 生成{aiNote ? " · " + aiNote : " · AI 智能分析"} · {Dr.today()}</div>
+            </div>
+          )}
+        </div>
+
+        {step === "goals" && (
+          <div className="drawer-foot no-print" style={{ borderTop: "1px solid var(--line)" }}>
+            <span style={{ fontSize: 12, color: "var(--ink-3)" }}>目标合计 {totTarget.toFixed(0)}h · {rows.length} 个科目</span>
+            <div className="spacer" />
+            <button className="btn btn-soft" onClick={close}>取消</button>
+            <button className="btn btn-accent" onClick={runAnalysis} disabled={!rows.length}>
+              <Icon name="chart" size={15} /> 生成分析报告
+            </button>
+          </div>
+        )}
+      </div>
+    </React.Fragment>
+  );
+}
+
+window.ReportModal = ReportModal;
+
+</script>
+  <script type="text/babel">
+/* ============ 备考日历 · 主应用 ============ */
+const Da = window.CalData;
+
+function useToast() {
+  const [msg, setMsg] = useState(null);
+  const show = useCallback((m) => {
+    setMsg(m);
+    clearTimeout(show._t);
+    show._t = setTimeout(() => setMsg(null), 2200);
+  }, []);
+  const node = <div className={"pill-toast" + (msg ? " show" : "")}>{msg}</div>;
+  return [show, node];
+}
+
+function SettingsDrawer({ settings, onSave, onClose, onReset, onExport }) {
+  const [show, setShow] = useState(false);
+  const [d, setD] = useState(settings);
+  useEffect(() => { const t = setTimeout(() => setShow(true), 10); return () => clearTimeout(t); }, []);
+  const close = () => { setShow(false); setTimeout(onClose, 300); };
+  const patch = (p) => setD((x) => ({ ...x, ...p }));
+  const save = () => { onSave(d); close(); };
+
+  return (
+    <React.Fragment>
+      <div className={"scrim" + (show ? " show" : "")} onClick={save} />
+      <div className={"drawer" + (show ? " show" : "")} style={{ width: 400 }}>
+        <div className="drawer-head">
+          <Icon name="gear" size={20} style={{ marginTop: 4 }} />
+          <div className="font-display" style={{ fontSize: 20, fontWeight: 700, flex: 1 }}>设置</div>
+          <button className="icon-btn" onClick={save}><Icon name="close" /></button>
+        </div>
+        <div className="drawer-body">
+          <div className="field">
+            <label className="field-label">每日学习目标 · {Da.fmtMin(d.dailyGoalMin)}</label>
+            <input type="range" min="60" max="720" step="30" value={d.dailyGoalMin}
+              style={{ width: "100%", accentColor: "var(--accent)" }}
+              onChange={(e) => patch({ dailyGoalMin: +e.target.value })} />
+            <div className="dur-quick">
+              {[180, 240, 300, 360, 480].map((m) => (
+                <button key={m} className={d.dailyGoalMin === m ? "on" : ""} onClick={() => patch({ dailyGoalMin: m })}>{Da.fmtMin(m)}</button>
+              ))}
+            </div>
+          </div>
+          <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
+          <div className="field">
+            <label className="field-label">AI 助手 · Anthropic API Key</label>
+            <p style={{ fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.6, margin: "0 0 10px" }}>
+              在 Claude 里使用时无需填写。若想<b>脱离 Claude、在自己浏览器或 Mac App 里也用 AI 排课与分析</b>，填入你的 API Key（仅存在本机浏览器，不上传）。获取：console.anthropic.com
+            </p>
+            <input className="input" type="password" value={d.apiKey || ""} placeholder="sk-ant-..."
+              onChange={(e) => patch({ apiKey: e.target.value.trim() })} autoComplete="off" />
+            <div style={{ fontSize: 11.5, color: d.apiKey ? "oklch(0.6 0.14 150)" : "var(--ink-3)", marginTop: 6 }}>
+              {window.claude && window.claude.complete ? "✓ 当前在 Claude 环境，AI 已可用" : d.apiKey ? "✓ 已填入 Key，AI 可用" : "未填写：AI 排课不可用，分析会用本地算法"}
+            </div>
+          </div>
+          <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
+          <div className="field">
+            <label className="field-label">接入 Apple / Google 日历</label>
+            <p style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.6, margin: "0 0 12px" }}>
+              导出 <b>.ics</b> 文件后双击即可导入系统日历。每次更新计划后重新导出即可同步最新安排。
+            </p>
+            <button className="btn btn-soft" onClick={onExport} style={{ width: "100%", justifyContent: "center" }}>
+              <Icon name="download" size={16} /> 导出 .ics 日历文件
+            </button>
+          </div>
+          <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
+          <button className="btn btn-ghost" style={{ color: "oklch(0.6 0.18 25)", width: "100%", justifyContent: "center" }}
+            onClick={() => { if (confirm("将清空所有数据并恢复示例，确定？")) { onReset(); close(); } }}>
+            <Icon name="trash" size={15} /> 重置全部数据
+          </button>
+        </div>
+      </div>
+    </React.Fragment>
+  );
+}
+
+function App() {
+  const [state, setState] = useState(() => Da.load());
+  const [view, setView] = useState("month"); // month | week | day
+  const [anchor, setAnchor] = useState(Da.today());
+  const [editing, setEditing] = useState(null); // event being edited
+  const [showStats, setShowStats] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showAI, setShowAI] = useState(false);
+  const [showPlanner, setShowPlanner] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [showCountdownMgr, setShowCountdownMgr] = useState(false);
+  const [reviewSubject, setReviewSubject] = useState(null);
+  const [collapsed, setCollapsed] = useState(false);
+  const [toast, toastNode] = useToast();
+
+  useEffect(() => { Da.save(state); window.CalData._apiKey = state.settings.apiKey || ""; }, [state]);
+
+  // 过滤隐藏科目
+  const visibleEvents = useMemo(() => {
+    const hid = state.settings.hiddenSubjects || [];
+    return hid.length ? state.events.filter((e) => !hid.includes(e.subjectId)) : state.events;
+  }, [state.events, state.settings.hiddenSubjects]);
+
+  const upsertEvent = (ev) => {
+    const clean = { ...ev };
+    delete clean._exists;
+    setState((s) => {
+      const exists = s.events.some((e) => e.id === clean.id);
+      const events = exists ? s.events.map((e) => (e.id === clean.id ? clean : e)) : [...s.events, clean];
+      return { ...s, events };
+    });
+  };
+  const deleteEvent = (id) => setState((s) => ({ ...s, events: s.events.filter((e) => e.id !== id) }));
+  const toggleSubject = (id) => setState((s) => {
+    const hid = new Set(s.settings.hiddenSubjects || []);
+    hid.has(id) ? hid.delete(id) : hid.add(id);
+    return { ...s, settings: { ...s.settings, hiddenSubjects: [...hid] } };
+  });
+
+  const newEvent = (date, start) => {
+    const firstVisible = state.subjects.find((s) => !(state.settings.hiddenSubjects || []).includes(s.id)) || state.subjects[0];
+    setEditing({
+      id: Da.uid("e"), date: date || anchor, subjectId: firstVisible.id, title: "",
+      start: start || null, durationMin: 60, done: false, notes: "", todos: [], _exists: false,
+    });
+  };
+  const openEvent = (e) => setEditing({ ...e, _exists: true });
+
+  // 导航
+  const navStep = (dir) => {
+    if (view === "month") {
+      const d = Da.parseISO(Da.startOfMonth(anchor));
+      d.setMonth(d.getMonth() + dir);
+      setAnchor(Da.iso(d));
+    } else if (view === "week") setAnchor(Da.addDays(anchor, dir * 7));
+    else setAnchor(Da.addDays(anchor, dir));
+  };
+  const periodLabel = useMemo(() => {
+    const d = Da.parseISO(anchor);
+    if (view === "month") return `${d.getFullYear()} · ${Da.MONTH_CN[d.getMonth()]}`;
+    if (view === "week") {
+      const s = Da.startOfWeek(anchor), e = Da.addDays(s, 6);
+      const sd = Da.parseISO(s), ed = Da.parseISO(e);
+      return `${sd.getMonth() + 1}月${sd.getDate()}日 – ${ed.getMonth() + 1}月${ed.getDate()}日`;
+    }
+    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 周${Da.DOW_CN[Da.dow(anchor)]}`;
+  }, [view, anchor]);
+
+  const goDay = (date) => { setAnchor(date); setView("day"); };
+  const doExport = () => { Da.downloadICS(state); toast("已导出 备考日历.ics"); };
+
+  const viewProps = {
+    anchor, events: visibleEvents, subjects: state.subjects, settings: state.settings,
+    onEvent: openEvent, onAdd: newEvent, onDay: goDay,
+  };
+
+  return (
+    <div className="app">
+      <div className="topbar">
+        <button className="icon-btn" onClick={() => setCollapsed((c) => !c)}><Icon name="menu" /></button>
+        <div className="brand">
+          <div className="brand-mark" />
+          <div>
+            <div className="brand-name">备考日历</div>
+            <div className="brand-sub">规划每一天 · 看见每一分</div>
+          </div>
+        </div>
+
+        <div className="nav-group" style={{ marginLeft: 8 }}>
+          <button className="btn btn-today" onClick={() => setAnchor(Da.today())}>今天</button>
+          <button className="icon-btn" onClick={() => navStep(-1)}><Icon name="prev" /></button>
+          <button className="icon-btn" onClick={() => navStep(1)}><Icon name="next" /></button>
+          <div className="period-label">{periodLabel}</div>
+        </div>
+
+        <div className="spacer" />
+
+        <div className="segment">
+          {[["month", "月"], ["week", "周"], ["day", "日"]].map(([k, l]) => (
+            <button key={k} className={view === k ? "on" : ""} onClick={() => setView(k)}>{l}</button>
+          ))}
+        </div>
+        <button className="icon-btn" title="每周规划" onClick={() => setShowPlanner(true)}><Icon name="target" size={19} /></button>
+        <button className="icon-btn" title="学习统计" onClick={() => setShowStats(true)}><Icon name="chart" size={19} /></button>
+        <button className="icon-btn" title="分析报告" onClick={() => setShowReport(true)}><Icon name="book" size={19} /></button>
+        <button className="btn btn-ai" onClick={() => setShowAI(true)}><Icon name="flame" size={16} /> AI 排课</button>
+        <button className="icon-btn" title="设置" onClick={() => setShowSettings(true)}><Icon name="gear" size={18} /></button>
+      </div>
+
+      <div className="main">
+        <Sidebar collapsed={collapsed} state={state} setState={setState} anchor={anchor}
+          onManageCountdown={() => setShowCountdownMgr(true)}
+          onReviewSubject={(id) => setReviewSubject(id)}
+          toggleSubject={toggleSubject} />
+        <div className="calwrap">
+          <MottoBar motto={state.settings.motto} onChange={(motto) => setState((s) => ({ ...s, settings: { ...s.settings, motto } }))} />
+          {view === "month" && <MonthView {...viewProps} />}
+          {view === "week" && <WeekView {...viewProps} />}
+          {view === "day" && <DayView {...viewProps} />}
+        </div>
+      </div>
+
+      <button className="fab" onClick={() => newEvent(anchor)} title="添加任务"><Icon name="plus" size={26} stroke={2.4} /></button>
+
+      {editing && (
+        <EventDrawer event={editing} subjects={state.subjects}
+          onSave={(ev) => { if ((ev.title || "").trim() || ev._exists) upsertEvent(ev); }}
+          onDelete={deleteEvent} onClose={() => setEditing(null)} />
+      )}
+      {showStats && <StatsModal events={state.events} subjects={state.subjects} settings={state.settings} anchor={anchor} onClose={() => setShowStats(false)} />}
+      {showPlanner && <WeeklyPlanner state={state} setState={setState} toast={toast} initialWeek={Da.weekKey(anchor)} onClose={() => setShowPlanner(false)} />}
+      {showReport && <ReportModal state={state} setState={setState} anchor={anchor} toast={toast} onClose={() => setShowReport(false)} />}
+      {showAI && <AssistantPanel state={state} setState={setState} toast={toast} onClose={() => setShowAI(false)} />}
+      {showCountdownMgr && <CountdownManager countdowns={state.countdowns}
+        onChange={(countdowns) => setState((s) => ({ ...s, countdowns }))}
+        onClose={() => setShowCountdownMgr(false)} />}
+      {reviewSubject && <SubjectReviewModal subjectId={reviewSubject} state={state} setState={setState} onClose={() => setReviewSubject(null)} />}
+      {showSettings && (
+        <SettingsDrawer settings={state.settings}
+          onSave={(set) => setState((s) => ({ ...s, settings: set }))}
+          onReset={() => { Da.reset(); setState(Da.defaultState()); }}
+          onExport={doExport}
+          onClose={() => setShowSettings(false)} />
+      )}
+      {toastNode}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+
+</script>
+</body>
+</html>
