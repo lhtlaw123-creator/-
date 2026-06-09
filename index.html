@@ -149,6 +149,11 @@ input, textarea { font-family: inherit; }
   display: flex; flex-direction: column;
   transition: width 0.3s var(--ease), opacity 0.3s var(--ease);
 }
+.sidebar-countdown-sticky {
+  position: sticky; top: -18px; z-index: 4; margin: -18px -16px 14px;
+  padding: 18px 16px 8px; background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+}
 .sidebar.collapsed { width: 0; padding: 0; opacity: 0; overflow: hidden; }
 .calwrap { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
 .sidebar-tools { margin-top: auto; padding-top: 24px; }
@@ -590,6 +595,8 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
 .rep-section { margin-bottom: 20px; }
 .rep-section h4 { font-family: var(--font-display); font-size: 15.5px; font-weight: 700; margin: 0 0 9px; }
 .rep-section p { font-size: 13.5px; line-height: 1.65; color: var(--ink); margin: 0; }
+.rep-prose p { line-height: 1.9; text-align: justify; text-indent: 2em; margin-bottom: 12px; }
+.rep-prose-accent { background: var(--accent-soft); border-radius: var(--r-lg); padding: 16px 20px; }
 .rep-section ul, .rep-section ol { margin: 0; padding-left: 20px; }
 .rep-section li { font-size: 13.5px; line-height: 1.7; color: var(--ink); }
 .rep-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
@@ -667,6 +674,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
 
 @media (max-width: 760px) {
   .sidebar { position: fixed; z-index: 50; top: 119px; bottom: 0; height: calc(100dvh - 119px); box-shadow: var(--shadow-lg); left: -100vw; width: 100vw; transition: left 0.3s var(--ease); }
+  .sidebar-countdown-sticky { top: -18px; }
   .sidebar:not(.collapsed) { left: 0; }
   .period-label { min-width: auto; }
   .brand-sub { display: none; }
@@ -1572,7 +1580,11 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     var apiKey = (isAdminUser ? (settings.apiKey || ADMIN_API_KEY) : (adminSettings.apiKey || ADMIN_API_KEY) || "").trim();
     var base = (((isAdminUser ? settings.aiBaseUrl : adminSettings.aiBaseUrl) || preset.base) || "").replace(/\/+$/, "");
     var model = ((isAdminUser ? settings.aiModel : adminSettings.aiModel) || "").trim();
-    if (!model && prov === "deepseek") model = (mode === "analysis") ? (preset.analysisModel || "deepseek-v4-pro") : (preset.chatModel || "deepseek-v4-flash");
+    if (!model && prov === "deepseek") {
+      model = !isAdminUser
+        ? (preset.chatModel || "deepseek-v4-flash")
+        : ((mode === "analysis") ? (preset.analysisModel || "deepseek-v4-pro") : (preset.chatModel || "deepseek-v4-flash"));
+    }
     if (!model) model = preset.model;
 
     return { provider: provider, prov: prov, preset: preset, apiKey: apiKey, base: base, model: model };
@@ -1620,7 +1632,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     const resp = await fetch(base + "/chat/completions", {
       method: "POST",
       headers: { "content-type": "application/json", "authorization": "Bearer " + key },
-      body: JSON.stringify({ model, max_tokens: 2000, messages: [{ role: "user", content: prompt }] }),
+      body: JSON.stringify({ model, max_tokens: mode === "analysis" ? 4000 : 2000, messages: [{ role: "user", content: prompt }] }),
     });
     if (!resp.ok) { const t = await resp.text(); const e = new Error("API " + resp.status + ": " + t.slice(0, 200)); e.code = "API_ERR"; throw e; }
     const data = await resp.json();
@@ -2567,6 +2579,12 @@ function Sidebar({ collapsed, state, setState, anchor, onManageCountdown, onRevi
 
   return (
     <div className={"sidebar" + (collapsed ? " collapsed" : "")}>
+      <div className="sidebar-countdown-sticky">
+        <CountdownCard countdowns={state.countdowns} active={settings.activeCountdown}
+          setActive={(i) => setState((s) => ({ ...s, settings: { ...s.settings, activeCountdown: i } }))}
+          onManage={onManageCountdown} />
+      </div>
+
       {/* 管理员：用户切换 */}
       {isAdmin && (
         <div style={{ marginBottom: 14 }}>
@@ -2591,10 +2609,6 @@ function Sidebar({ collapsed, state, setState, anchor, onManageCountdown, onRevi
           <div style={{ height: 1, background: "var(--line)", margin: "10px 0" }} />
         </div>
       )}
-
-      <CountdownCard countdowns={state.countdowns} active={settings.activeCountdown}
-        setActive={(i) => setState((s) => ({ ...s, settings: { ...s.settings, activeCountdown: i } }))}
-        onManage={onManageCountdown} />
 
       <MemoBox memos={state.memos || []} onChange={(memos) => setState((s) => ({ ...s, memos }))} />
 
@@ -3617,72 +3631,51 @@ function subItemTarget(row) { return (row.subItems || []).reduce((a, x) => a + (
 // 本地兜底分析（无 AI 时）
 function localAnalyze(rows, map, days, label) {
   let totTarget = 0, totDone = 0;
-  const subjects = rows.map((r) => {
+  const subjectFacts = rows.map((r) => {
     const real = realFor(map, r);
     const target = r.totalHours || subItemTarget(r) || 0;
     const done = (r.subItems && r.subItems.length) ? subItemDone(r) : real.doneMin / 60;
     totTarget += target; totDone += done;
-    const ratio = target ? Math.min(1, done / target) : 0;
-    const subItems = (r.subItems || []).map((si) => {
-      const sr = si.hours ? Math.min(1, (+si.done || 0) / si.hours) : 0;
-      let c;
-      if (sr >= 1) c = "已达成";
-      else if (sr >= 0.5) c = `进行中（${Math.round(sr * 100)}%），继续推进`;
-      else if (+si.done > 0) c = `刚起步（${Math.round(sr * 100)}%），需加力`;
-      else c = "尚未开始，优先安排";
-      return { name: si.name, comment: c };
-    });
-    let c;
-    if (ratio >= 1) c = `已达成 ${target}h 目标，待办完成率 ${Math.round(real.todoRatio * 100)}%。`;
-    else c = `目标 ${target}h，已完成 ${done.toFixed(1)}h（${Math.round(ratio * 100)}%），待办完成 ${Math.round(real.todoRatio * 100)}%。`;
-    return { name: r.name, comment: c, subItems };
+    return { name: r.name || "未命名科目", target, done, ratio: target ? done / target : 0, todoDone: real.todoDone, todoTotal: real.todoTotal, subItems: r.subItems || [] };
   });
   const activeDays = days.filter((d) => d.done > 0).length;
   const overallRatio = totTarget ? Math.min(1, totDone / totTarget) : 0;
   const score = Math.round(Math.min(100, overallRatio * 60 + (activeDays / Math.max(1, days.length)) * 40));
-  const wins = [], risks = [], suggestions = [];
-  if (overallRatio >= 0.7) wins.push(`目标整体达成 ${Math.round(overallRatio * 100)}%，执行到位`);
-  if (activeDays >= days.length * 0.7) wins.push(`${days.length} 天中 ${activeDays} 天有推进`);
-  rows.forEach((r) => {
-    const target = r.totalHours || subItemTarget(r);
-    const done = (r.subItems && r.subItems.length) ? subItemDone(r) : realFor(map, r).doneMin / 60;
-    if (target && done < target * 0.6) risks.push(`${r.name} 距 ${target}h 目标还差 ${(target - done).toFixed(1)}h`);
-    (r.subItems || []).forEach((si) => { if (si.hours && (+si.done || 0) < si.hours * 0.4) risks.push(`${r.name}·${si.name} 进度偏慢`); });
-  });
-  if (days.length - activeDays > 0) suggestions.push(`有 ${days.length - activeDays} 天空白，下阶段保持每天都有推进`);
-  suggestions.push("把落后子项拆成更小的每日待办，交给 AI 排进日历");
-  suggestions.push("达成快的子项可适当压缩，把时间让给薄弱子项");
+  const strongest = subjectFacts.slice().sort((a, b) => b.ratio - a.ratio)[0];
+  const weakest = subjectFacts.slice().sort((a, b) => a.ratio - b.ratio)[0];
+  const subjectText = subjectFacts.map((x) => `${x.name}目标${x.target.toFixed(1)}小时、完成${x.done.toFixed(1)}小时、达成率${Math.round(x.ratio * 100)}%`).join("；");
+  const taskCount = subjectFacts.reduce((n, x) => n + x.todoTotal, 0);
+  const taskDone = subjectFacts.reduce((n, x) => n + x.todoDone, 0);
   return {
-    headline: score >= 75 ? "本阶段执行得不错，继续保持" : score >= 50 ? "完成了一部分，仍有空间" : "进度偏慢，需要收紧节奏",
-    score, overall: `${label}设定目标合计 ${totTarget.toFixed(1)}h、已完成 ${totDone.toFixed(1)}h（${Math.round(overallRatio * 100)}%）；${days.length} 天中 ${activeDays} 天有效推进。`,
-    subjects, wins: wins.length ? wins : ["保持了基本学习投入"], risks: risks.length ? risks : ["暂无明显风险，注意持续性"], suggestions,
+    headline: score >= 75 ? "学习执行总体稳定，下一阶段应转向质量巩固" : score >= 50 ? "学习投入已经形成，但计划兑现仍需加强" : "当前学习进度明显不足，需要立即重整执行节奏",
+    score,
+    conclusion: `总体结论是，${label}共完成学习${totDone.toFixed(1)}小时，相对于${totTarget.toFixed(1)}小时目标的完成比例为${Math.round(overallRatio * 100)}%，并在${days.length}天中形成了${activeDays}个有效学习日。现有数据表明，学习活动已经产生实际投入，但目标完成程度与学习连续性仍需结合后续计划进一步校准；当前表现评分为${score}分，主要依据目标兑现程度与有效学习日覆盖率综合计算。`,
+    timeAnalysis: `总体学习时间方面，${label}实际投入为${totDone.toFixed(1)}小时，平均每个有效学习日投入${activeDays ? (totDone / activeDays).toFixed(1) : "0.0"}小时，有效学习日覆盖率为${Math.round(activeDays / Math.max(1, days.length) * 100)}%。从时间分配结构看，${subjectText || "当前尚缺少可用于比较的科目时长记录"}。这一分布能够反映主要精力投向，但仅凭时长不能直接推断掌握质量，后续仍应通过真题正确率、复盘结果和知识点回忆情况验证投入是否转化为有效学习成果。`,
+    completionAnalysis: `完成比例方面，整体目标达成率为${Math.round(overallRatio * 100)}%。${strongest ? `完成表现相对较好的科目是${strongest.name}，其达成率为${Math.round(strongest.ratio * 100)}%；` : ""}${weakest ? `完成压力最明显的科目是${weakest.name}，其达成率为${Math.round(weakest.ratio * 100)}%。` : ""}该比例说明计划与实际执行之间仍存在${overallRatio >= 0.8 ? "较小但需要持续控制的差距" : "需要重点处理的差距"}，下一阶段应优先确保核心任务完成，再扩展补充任务，避免目标数量增加却降低整体兑现率。`,
+    taskDesignAnalysis: `任务设置方面，当前共记录${taskCount}项待办，其中完成${taskDone}项，待办完成率为${taskCount ? Math.round(taskDone / taskCount * 100) : 0}%。现有目标以科目时长和部分子项作为主要约束，能够提供基本方向，但若任务缺少明确的成果标准、预计耗时和截止节点，执行过程中仍容易出现“投入了时间但无法判断是否完成”的情况。后续任务应以可检验成果为单位设置，并使单项任务能够在一个学习时段内完成。`,
+    optimizationAnalysis: `优化与不足方面，当前最需要改善的是学习连续性、目标优先级与完成质量验证之间的衔接。下一阶段应先补齐低完成率科目的关键任务，并依据剩余时间重新分配目标；同时应在每次学习结束后记录完成产出、错误原因与下一次行动，使时长数据能够对应具体成果。若某项任务连续两个学习时段仍未完成，应立即缩小任务颗粒度或调整方法，而不应仅通过延长计划时长处理。`,
   };
 }
 
-function buildDeepReportPrompt(rows, map, days, label, from, to) {
-  const lines = rows.map((r) => {
-    const real = realFor(map, r);
-    const target = r.totalHours || subItemTarget(r);
-    const subs = (r.subItems || []).map((si) => `  - 子项「${si.name}」目标${si.hours}h，已完成${si.done || 0}h`).join("\n");
-    return `科目「${r.name}」总目标${target}h，实际学习${Dr.fmtHrs(real.doneMin)}h，待办完成${real.todoDone}/${real.todoTotal}` + (subs ? "\n" + subs : "（未拆子项）");
-  });
-  const dayLine = days.map((d) => `${d.date.slice(5)}:${Math.round(d.done / 60 * 10) / 10}h`).join(" ");
-  return [
-    "你是资深教育评估专家与学习教练。请基于以下学习数据，撰写一份正式、详尽、有深度的学习分析报告，用于归档和导出为Word文档。",
-    "报告要求：",
-    "1. 语言正式但不枯燥，结构清晰，段落分明。",
-    "2. 每个科目写200-400字的深度分析，包含：学习进度评估、时间利用效率、知识掌握程度推断、薄弱环节识别、改进路径。",
-    "3. 每个子项写80-150字的专项分析。",
-    "4. 整体概览写300-500字，涵盖学习节奏、投入产出比、持续性评价。",
-    "5. 亮点和风险各至少列3条，每条30-60字，要具体。",
-    "6. 下阶段建议至少5条，每条50-80字，标明优先级（高/中/低）。",
-    "7. 新增「总体评价」字段（150-250字），以教练口吻给出阶段性总结和鼓励。",
-    "只输出 JSON：",
-    '{"headline":"精炼有力的标题","score":0到100,"overall":"300-500字整体分析","summary":"150-250字总结鼓励","subjects":[{"name":"科目名","comment":"200-400字深度分析","subItems":[{"name":"子项名","comment":"80-150字分析"}]}],"wins":["亮点1","亮点2","亮点3"],"risks":["风险1","风险2","风险3"],"trend":"趋势判断","suggestions":["建议1 优先级:高","建议2..."]}',
-    "时间范围：" + from + " 至 " + to,
-    "数据：", lines.join("\n"),
-    "每日完成时长：" + dayLine,
-  ].join("\n");
+function buildDeepReportPrompt(rows, map, days, label, from, to) { return buildReportPrompt(rows, map, days, label, from, to); }
+
+function normalizeReportAnalysis(value) {
+  const a = value && typeof value === "object" ? value : {};
+  const prose = (v) => {
+    if (Array.isArray(v)) return v.map((x) => String(x || "").trim()).filter(Boolean).join("\n\n");
+    if (v && typeof v === "object") return Object.values(v).map((x) => String(x || "").trim()).filter(Boolean).join("\n\n");
+    return String(v || "").trim();
+  };
+  const score = Number(a.score);
+  return {
+    headline: prose(a.headline) || "学习执行情况分析",
+    score: Number.isFinite(score) ? Math.max(0, Math.min(100, Math.round(score))) : 0,
+    conclusion: prose(a.conclusion || a.overall),
+    timeAnalysis: prose(a.timeAnalysis),
+    completionAnalysis: prose(a.completionAnalysis),
+    taskDesignAnalysis: prose(a.taskDesignAnalysis),
+    optimizationAnalysis: prose(a.optimizationAnalysis),
+  };
 }
 
 function buildReportPrompt(rows, map, days, label, from, to) {
@@ -3694,20 +3687,15 @@ function buildReportPrompt(rows, map, days, label, from, to) {
   });
   const dayLine = days.map((d) => `${d.date.slice(5)}:${Math.round(d.done / 60 * 10) / 10}h`).join(" ");
   return [
-    "你是资深备考教练与学习策略专家。基于下面的" + label + "学习数据做一份深度、全面、有洞察力的中文分析报告。",
-    "分析维度（必须全部覆盖）：",
-    "1. 整体学习状态评估（学习节奏、专注度、持续性）。",
-    "2. 各科目深度分析：不仅要看时长，更要看学习质量——子项完成质量、时间分配合理性、薄弱环节识别。",
-    "3. 学习策略诊断：哪些方法有效、哪些需要调整、知识体系是否有断层。",
-    "4. 趋势判断：与前阶段相比是否有进步或退步迹象。",
-    "5. 个性化建议：针对当前阶段给出具体可执行的改进方案。",
-    "每个科目的每个子项都要逐一点评，点评需具体指出进度、质量、问题和建议。",
-    "只输出 JSON，不要 markdown：",
-    '{"headline":"一句精炼且有洞察力的总评","score":0到100整数,"overall":"3-5句深度整体分析，涵盖学习状态、趋势、关键问题","subjects":[{"name":"科目名","comment":"2-3句深度点评，含时长分析、完成质量、薄弱点","subItems":[{"name":"子项名","comment":"针对子项进度的深度点评，指出问题和建议"}]}],"wins":["至少2个亮点，具体到科目或子项"],"risks":["至少2个风险点，给出严重程度判断"],"trend":"与前期的对比趋势判断","suggestions":["至少3条具体可执行的下阶段建议，标明优先级"]}',
+    "你是严谨的教育评估专家。请基于下面的" + label + "真实学习数据，完成一份具有诊断深度的中文学习分析报告。",
+    "报告必须先给结论，再分别深入分析总体学习时间、完成比例、任务设置情况、优化方向与不足。不能只复述数据，必须解释数据反映的学习节奏、计划合理性、执行偏差、潜在原因和下一阶段调整逻辑。",
+    "写作必须使用正式、严谨、细致的连续 prose。每个字段应自然成段，建议每段不少于四句且约250至500字；每段第一句必须是明确的主题句。禁止一两句话单独成段，禁止无序列表和有序列表，禁止项目符号，禁止编号式建议，禁止奇怪比喻，禁止重述任务要求，禁止客套和鼓励性套话。",
+    "只输出可解析 JSON，不要输出 markdown 代码框，不要在 JSON 外添加任何文字。JSON 字段必须完整：",
+    '{"headline":"正式且明确的结论标题","score":0到100整数,"conclusion":"先给结论的完整长段落","timeAnalysis":"总体学习时间深度分析长段落","completionAnalysis":"完成比例深度分析长段落","taskDesignAnalysis":"任务设置情况深度分析长段落","optimizationAnalysis":"优化方向与不足深度分析长段落"}',
     "时间范围：" + from + " 至 " + to,
     "数据：", lines.join("\n"),
     "每日完成时长：" + dayLine,
-    "要求：每条点评 20-60 字，要有实质内容，不能泛泛而谈。score 严格反映完成度，不要给面子分。",
+    "评分必须严格反映完成度、有效学习日覆盖率和任务兑现情况，不要给面子分。不得虚构数据中不存在的考试成绩、正确率、专注度或知识掌握结论；可以明确指出因缺少相关数据而无法判断。",
   ].join("\n");
 }
 
@@ -3799,6 +3787,10 @@ function GoalRow({ row, subjects, usedSubjectIds, realDone, onChange, onRemove }
 // 格式：全文宋体四号(14pt)，除一级标题(h4)外全部首行缩进，行距1.5
 function generateWordHTML(analysis, rows, state, gathered, totDone, totTarget, activeDays) {
   const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const addSection = (title, text) => {
+    bodyHtml += '<h4>' + esc(title) + '</h4>';
+    String(text || "").split(/\n{2,}/).filter(Boolean).forEach((line) => { bodyHtml += '<p>' + esc(line.trim()) + '</p>'; });
+  };
 
   let bodyHtml = '';
 
@@ -3812,61 +3804,11 @@ function generateWordHTML(analysis, rows, state, gathered, totDone, totTarget, a
   bodyHtml += '<div class="kpi"><b>' + activeDays + '/' + gathered.days.length + '</b><span>学习天数</span></div></div>';
   bodyHtml += '<div class="score">表现评分：' + (analysis.score || 0) + '分</div></div>';
 
-  // 整体概览
-  bodyHtml += '<h4>一、整体概览</h4>';
-  (analysis.overall || '').split('\n').filter(Boolean).forEach((line) => {
-    bodyHtml += '<p>' + esc(line.trim()) + '</p>';
-  });
-
-  // 总结（深度分析）
-  if (analysis.summary) {
-    bodyHtml += '<h4>二、总体评价</h4>';
-    (analysis.summary || '').split('\n').filter(Boolean).forEach((line) => {
-      bodyHtml += '<p>' + esc(line.trim()) + '</p>';
-    });
-  }
-
-  // 各科目深度分析
-  const sectionIdx = analysis.summary ? '三' : '二';
-  bodyHtml += '<h4>' + sectionIdx + '、各科目深度分析</h4>';
-  rows.forEach((r, ri) => {
-    const target = r.totalHours || (r.subItems || []).reduce((a, x) => a + (+x.hours || 0), 0);
-    const done = (r.subItems && r.subItems.length) ? (r.subItems || []).reduce((a, x) => a + (+x.done || 0), 0) : 0;
-    const ratio = target ? Math.min(1, done / target) : 0;
-    const ai = (analysis.subjects || []).find((x) => x.name === r.name || (x.name && r.name.includes(x.name)));
-    bodyHtml += '<h5>' + (ri + 1) + '. ' + esc(r.name || '未命名') + '（已完成 ' + done.toFixed(1) + 'h / 目标 ' + (target || '—') + 'h，' + Math.round(ratio * 100) + '%）</h5>';
-    if (ai && ai.comment) bodyHtml += '<p>' + esc(ai.comment) + '</p>';
-    (r.subItems || []).forEach((si) => {
-      const sai = ai && ai.subItems && ai.subItems.find((x) => x.name === si.name || (x.name && si.name.includes(x.name)));
-      bodyHtml += '<p class="subitem"><strong>' + esc(si.name) + '</strong>：' + (si.done || 0) + '/' + si.hours + 'h';
-      if (sai && sai.comment) bodyHtml += ' — ' + esc(sai.comment);
-      bodyHtml += '</p>';
-    });
-  });
-
-  // 亮点
-  const nextIdx1 = analysis.summary ? '四' : '三';
-  bodyHtml += '<h4>' + nextIdx1 + '、亮点</h4>';
-  (analysis.wins || []).forEach((w) => { bodyHtml += '<p>' + esc(w) + '</p>'; });
-
-  // 风险
-  const nextIdx2 = analysis.summary ? '五' : '四';
-  bodyHtml += '<h4>' + nextIdx2 + '、风险与落后点</h4>';
-  (analysis.risks || []).forEach((w) => { bodyHtml += '<p>' + esc(w) + '</p>'; });
-
-  // 趋势
-  if (analysis.trend) {
-    const nextIdx3 = analysis.summary ? '六' : '五';
-    bodyHtml += '<h4>' + nextIdx3 + '、趋势判断</h4>';
-    bodyHtml += '<p>' + esc(analysis.trend) + '</p>';
-  }
-
-  // 建议
-  const suggestIdx = analysis.summary ? (analysis.trend ? '七' : '六') : (analysis.trend ? '六' : '五');
-  bodyHtml += '<h4>' + suggestIdx + '、下阶段建议</h4>';
-  (analysis.suggestions || []).forEach((w, i) => {
-    bodyHtml += '<p>' + (i + 1) + '. ' + esc(w) + '</p>';
-  });
+  addSection('结论', analysis.conclusion || analysis.overall);
+  addSection('总体学习时间分析', analysis.timeAnalysis);
+  addSection('完成比例分析', analysis.completionAnalysis);
+  addSection('任务设置情况分析', analysis.taskDesignAnalysis);
+  addSection('优化方向与不足', analysis.optimizationAnalysis);
 
   // 页脚
   bodyHtml += '<div class="footer">—— 由备考日历生成 · ' + Dr.today() + '</div>';
@@ -3892,6 +3834,16 @@ function generateWordHTML(analysis, rows, state, gathered, totDone, totTarget, a
     + '.footer { text-align: right; font-size: 10pt; color: #999; margin-top: 40px; padding-top: 12px; border-top: 1px solid #ddd; }'
     + '@media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }'
     + '</style></head><body>' + bodyHtml + '</body></html>';
+}
+
+function ProseSection({ title, text, accent }) {
+  const paragraphs = String(text || "").split(/\n{2,}/).map((x) => x.trim()).filter(Boolean);
+  return (
+    <div className={"rep-section rep-prose" + (accent ? " rep-prose-accent" : "")}>
+      <h4>{title}</h4>
+      {paragraphs.length ? paragraphs.map((p, i) => <p key={i}>{p}</p>) : <p>暂无可分析的数据。</p>}
+    </div>
+  );
 }
 
 function ReportModal({ state, setState, onClose, anchor, toast, onOpenAI }) {
@@ -3960,7 +3912,7 @@ function ReportModal({ state, setState, onClose, anchor, toast, onOpenAI }) {
         var thinkings = [
           "正在分析 " + gathered.label + " 的学习数据…",
           "正在评估学习节奏与投入产出比…",
-          rows.length > 0 ? "正在分析「" + rows[Math.min(next-2, rows.length-1)].name + "」…" : "正在逐科分析…",
+          rows.length > 0 ? "正在分析「" + rows[Math.max(0, Math.min(next - 2, rows.length - 1))].name + "」…" : "正在逐科分析…",
           "正在识别薄弱环节…",
           "正在制定改进方案…",
           "正在整理最终报告…",
@@ -3973,14 +3925,16 @@ function ReportModal({ state, setState, onClose, anchor, toast, onOpenAI }) {
     if (Dr.aiAvailable(state)) {
       try {
         const raw = await Dr.aiComplete(buildReportPrompt(rows, gathered.map, gathered.days, gathered.label, gathered.from, gathered.to), state.settings, "analysis");
-        result = window.parseJSONLoose(raw);
-        if (!result || !result.subjects) { result = null; note = "AI 返回异常，已用本地分析。"; }
-      } catch (e) { note = "AI 暂不可用（" + String(e.message || e).slice(0, 40) + "），已用本地分析。"; }
+        result = normalizeReportAnalysis(window.parseJSONLoose(raw));
+        if (!result || !result.conclusion || !result.timeAnalysis || !result.completionAnalysis || !result.taskDesignAnalysis || !result.optimizationAnalysis) {
+          result = null; note = "AI 返回格式异常，以下为本地兜底分析，请重新生成。";
+        }
+      } catch (e) { note = "AI 调用失败（" + String(e.message || e).slice(0, 60) + "），以下为本地兜底分析，请检查 API 状态后重新生成。"; }
     } else {
-      note = "未接入 AI（设置里填 API Key 即可启用），当前为本地智能分析。";
+      note = "AI 当前不可用，以下为本地兜底分析。";
     }
     clearInterval(timer);
-    if (!result) result = localAnalyze(rows, gathered.map, gathered.days, gathered.label);
+    if (!result) result = normalizeReportAnalysis(localAnalyze(rows, gathered.map, gathered.days, gathered.label));
     // 标记全部完成
     setProgress({ steps: steps.map(function(s) { return { text: s.text, status: "done" }; }), current: steps.length, thinking: "✓ 报告生成完成" });
     setTimeout(function() { setAnalysis(result); setAiNote(note); setStep("report"); }, 400);
@@ -4164,57 +4118,11 @@ function ReportModal({ state, setState, onClose, anchor, toast, onOpenAI }) {
                 </div>
               </div>
 
-              <div className="rep-section"><h4>整体概览</h4><p>{analysis.overall}</p></div>
-
-              <div className="rep-section">
-                <h4>各科目 · 目标拆解与逐项分析</h4>
-                {rows.map((r) => {
-                  const subj = r.subjectId ? state.subjects.find((s) => s.id === r.subjectId) : null;
-                  const color = subj ? subj.solid : "var(--ink-3)";
-                  const line = subj ? subj.line : "var(--line)";
-                  const ai = (analysis.subjects || []).find((x) => x.name === r.name || (x.name && r.name.includes(x.name)));
-                  const target = r.totalHours || subItemTarget(r);
-                  const done = (r.subItems && r.subItems.length) ? subItemDone(r) : realFor(gathered.map, r).doneMin / 60;
-                  const ratio = target ? Math.min(1, done / target) : 0;
-                  return (
-                    <div className="rep-subj" key={r.id}>
-                      <div className="rep-subj-top">
-                        <span className="subj-dot" style={{ background: color }} /><b>{r.name || "未命名"}</b>
-                        <span className="rep-subj-fig tnum">{done.toFixed(1)}h / 目标 {target || "—"}h · {Math.round(ratio * 100)}%</span>
-                      </div>
-                      <div className="sbar" style={{ margin: "4px 0 6px" }}>
-                        <i style={{ width: `100%`, background: line, opacity: 0.4 }} />
-                        <i style={{ width: `${ratio * 100}%`, background: color, marginTop: -9 }} />
-                      </div>
-                      {ai && ai.comment && <p className="rep-subj-comment">{ai.comment}</p>}
-                      {(r.subItems || []).length > 0 && (
-                        <div className="rep-subitems">
-                          {r.subItems.map((si) => {
-                            const sr = si.hours ? Math.min(1, (+si.done || 0) / si.hours) : 0;
-                            const sai = ai && ai.subItems && ai.subItems.find((x) => x.name === si.name || (x.name && si.name.includes(x.name)));
-                            return (
-                              <div className="rep-subitem" key={si.id}>
-                                <span className="rep-si-name">{si.name}</span>
-                                <div className="rep-si-bar"><i style={{ width: `${sr * 100}%`, background: color }} /></div>
-                                <span className="rep-si-fig tnum">{si.done || 0}/{si.hours}h</span>
-                                <span className="rep-si-pct tnum" style={{ color: sr >= 1 ? "oklch(0.6 0.15 150)" : "var(--ink-2)" }}>{Math.round(sr * 100)}%</span>
-                                {sai && <span className="rep-si-comment">· {sai.comment}</span>}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="rep-cols">
-                <div className="rep-section"><h4>✦ 亮点</h4><ul>{(analysis.wins || []).map((w, i) => <li key={i}>{w}</li>)}</ul></div>
-                <div className="rep-section"><h4>⚠ 风险 / 落后</h4><ul>{(analysis.risks || []).map((w, i) => <li key={i}>{w}</li>)}</ul></div>
-              </div>
-
-              <div className="rep-section rep-suggest"><h4>下阶段建议</h4><ol>{(analysis.suggestions || []).map((w, i) => <li key={i}>{w}</li>)}</ol></div>
+              <ProseSection title="结论" text={analysis.conclusion || analysis.overall} />
+              <ProseSection title="总体学习时间分析" text={analysis.timeAnalysis} />
+              <ProseSection title="完成比例分析" text={analysis.completionAnalysis} />
+              <ProseSection title="任务设置情况分析" text={analysis.taskDesignAnalysis} />
+              <ProseSection title="优化方向与不足" text={analysis.optimizationAnalysis} accent />
               <div className="rep-foot">由 备考日历 生成{aiNote ? " · " + aiNote : " · AI 智能分析"} · {Dr.today()}</div>
             </div>
           )}
@@ -4251,6 +4159,24 @@ function useToast() {
   }, []);
   const node = <div className={"pill-toast" + (msg ? " show" : "")}>{msg}</div>;
   return [show, node];
+}
+
+class AppErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(error) { return { error }; }
+  componentDidCatch(error, info) { console.error("App render error:", error, info); }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24, background: "var(--bg)" }}>
+        <div style={{ maxWidth: 520, background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, padding: 24, boxShadow: "var(--shadow-lg)" }}>
+          <div className="font-display" style={{ fontSize: 20, fontWeight: 700, marginBottom: 10 }}>页面遇到异常，但数据仍然安全</div>
+          <p style={{ fontSize: 13.5, lineHeight: 1.7, color: "var(--ink-2)", margin: "0 0 16px" }}>报告内容格式异常，应用已阻止整页白屏。重新加载后可继续使用；若问题发生在 AI 报告中，请重新生成一次。</p>
+          <button className="btn btn-accent" onClick={() => window.location.reload()}>重新加载</button>
+        </div>
+      </div>
+    );
+  }
 }
 
 function GPAOverlay({ onClose }) {
@@ -5017,7 +4943,7 @@ function App() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+ReactDOM.createRoot(document.getElementById("root")).render(<AppErrorBoundary><App /></AppErrorBoundary>);
 
 </script>
 </body>
