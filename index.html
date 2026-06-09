@@ -1431,7 +1431,8 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     for (var i = 0; i < (actions || []).length; i++) {
       var a = actions[i] || {};
       var op = a.op || "";
-      var target = a.targetUser || a.username || ((getLoggedInUser() || {}).username);
+      var currentUser = (getLoggedInUser() || {}).username;
+      var target = a.targetUser || a.username || currentUser;
       if (!op) continue;
 
       if (op === "user.create") {
@@ -1463,11 +1464,12 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
         persistUsers = true;
         summary.push({ op: "update", text: (ua.aiEnabled ? "开启" : "关闭") + "用户「" + target + "」AI 权限" });
       } else if (op === "user.password") {
-        var up = userExists(target);
-        if (!up || !a.password) continue;
+        if (!a.targetUser || !a.password) continue;
+        var up = userExists(a.targetUser);
+        if (!up) continue;
         up.passwordHash = await sha256(a.password);
         persistUsers = true;
-        summary.push({ op: "update", text: "重置用户「" + target + "」密码" });
+        summary.push({ op: "update", text: "重置用户「" + a.targetUser + "」密码" });
       } else if (op.indexOf("event.") === 0) {
         var us = loadUserState(target);
         var evActions = [Object.assign({}, a, { op: op.replace("event.", "") })];
@@ -1733,7 +1735,23 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
       // 缓存所有用户数据供管理员查看
       try { localStorage.setItem("_beikao-cloud-cache", JSON.stringify(cloud.users)); } catch(e) {}
       if (Array.isArray(cloud.accounts) && cloud.accounts.length) {
-        try { saveUsers(normalizeUsers(cloud.accounts)); } catch(e0) {}
+        try { 
+          // 合并账户：仅添加新用户，更新角色/AI权限，不覆盖已有用户的密码
+          var localU = getUsers();
+          var cloudU = normalizeUsers(cloud.accounts);
+          cloudU.forEach(function(cu) {
+            var lu = localU.find(function(l) { return l.username === cu.username; });
+            if (lu) {
+              // 已有用户：只更新非密码字段
+              lu.role = cu.role;
+              lu.aiEnabled = cu.aiEnabled;
+            } else {
+              // 新用户：完整添加
+              localU.push(cu);
+            }
+          });
+          saveUsers(localU);
+        } catch(e0) {}
       }
       userData = cloud.users[username] || cloud;
     }
@@ -3064,7 +3082,7 @@ function buildAdminPrompt(state, userText) {
   const evs = Dai.compactEvents(state, Dai.addDays(today, -14), Dai.addDays(today, 90));
   const subjList = Dai.GROUP_ORDER.map((g) => g + "：" + state.subjects.filter((s) => s.group === g).map((s) => s.name).join("、")).join("\n");
   return [
-    "你是备考日历的 admin 管理助手。当前登录者是 admin，可以按自然语言管理所有用户、admin 自己、日程、科目和 AI 权限。",
+    "你是备考日历的 admin 管理助手。当前登录者是 admin，可以按自然语言管理所有用户、admin 自己、日程、科目和 AI 权限。重要安全规则：绝对不能修改 admin 自己的密码，除非用户明确说「修改 admin 的密码」或「修改我的密码」，且必须显式指定 targetUser。",
     "今天是 " + today + "。请严格只输出 JSON 对象，不要 markdown：",
     '{"reply":"中文说明","actions":[ ... ]}',
     "可用用户：" + JSON.stringify(users),
@@ -3075,8 +3093,7 @@ function buildAdminPrompt(state, userText) {
     '用户：{"op":"user.create","username":"新用户名","password":"初始密码","role":"user/admin","aiEnabled":true/false}',
     '用户：{"op":"user.delete","username":"用户名"}；不能删除 admin',
     '用户：{"op":"user.role","targetUser":"用户名","role":"user/admin"}',
-    '用户：{"op":"user.ai","targetUser":"用户名","enabled":true/false}',
-    '用户：{"op":"user.password","targetUser":"用户名","password":"新密码"}',
+    '用户（修改密码必须显式填写 targetUser，绝不可省略）：{"op":"user.password","targetUser":"用户名","password":"新密码"}',
     '日程：{"op":"event.create","targetUser":"用户名","date":"YYYY-MM-DD","subject":"科目名","title":"标题","start":"HH:MM"或null,"durationMin":整数,"todos":["待办"]}',
     '日程：{"op":"event.update","targetUser":"用户名","id":"事件id","date?":"...","subject?":"...","title?":"...","start?":"...","durationMin?":整数,"done?":true/false,"todos?":["..."]}',
     '日程：{"op":"event.delete","targetUser":"用户名","id":"事件id"}',
@@ -3085,7 +3102,7 @@ function buildAdminPrompt(state, userText) {
     '科目：{"op":"subject.delete","targetUser":"用户名","name":"科目名"}',
     '科目：{"op":"subject.hide","targetUser":"用户名","name":"科目名"} 或 {"op":"subject.show","targetUser":"用户名","name":"科目名"}',
     '设置：{"op":"settings.patch","targetUser":"用户名","settings":{"dailyGoalMin":360,"motto":"..."}}',
-    "规则：targetUser 省略时表示 admin 当前自己；update/delete 日程只能使用已列出的真实 id；如果用户只是问问题而不需要改数据，actions 返回空数组。",
+    "规则：user.password 必须显式指定 targetUser（绝不可省略），且禁止修改 admin 密码除非用户明确要求；其他操作 targetUser 省略时表示 admin 自己；update/delete 日程只能使用已列出的真实 id；如果用户只是问问题而不需要改数据，actions 返回空数组。",
     "用户指令：" + JSON.stringify(userText),
   ].join("\n");
 }
@@ -4628,6 +4645,21 @@ function App() {
         }
       } catch(e) { /* 解码失败则走正常流程 */ }
     }
+    // 非 Admin 用户：检查 admin 是否已开启云同步，自动拉取数据
+    if (!isAdminUser) {
+      try {
+        var adminRaw = localStorage.getItem(Da.KEY + "-admin");
+        if (adminRaw) {
+          var adminSt = JSON.parse(adminRaw);
+          var adminSet = (adminSt && adminSt.settings) || {};
+          if (adminSet.syncEnabled && adminSet.syncToken && adminSet.syncGistId) {
+            // 用 admin 的同步凭证拉取当前用户数据
+            pullCloudWithCreds(adminSet.syncToken, adminSet.syncGistId);
+            return;
+          }
+        }
+      } catch(e) {}
+    }
     // 未配置云同步：弹出提示让用户输入
     if (!st.settings.syncToken) {
       setTimeout(function() { setShowSyncPrompt(true); }, 600);
@@ -4695,6 +4727,26 @@ function App() {
       setSyncStatus("ok");
     } catch (e) { setSyncStatus("error"); }
   }, []);
+  // 非 Admin 用户用 admin 的同步凭证拉取自己数据
+  const pullCloudWithCreds = useCallback(async (token, gistId) => {
+    if (!token || !gistId) return;
+    try {
+      setSyncStatus("syncing");
+      const cloud = await Da.cloudRead(token, gistId);
+      if (cloud) {
+        const st = stateRef.current;
+        const localT = st.updatedAt || 0, cloudT = cloud.updatedAt || 0;
+        if (cloudT > localT) {
+          const merged = Da.mergeCloud(st, cloud);
+          if (merged.settings && merged.settings.passwordHash) {
+            Da.setPasswordHash(merged.settings.passwordHash);
+          }
+          setState(merged);
+        }
+      }
+      setSyncStatus("ok");
+    } catch (e) { setSyncStatus("error"); }
+  }, []);
 
   useEffect(() => { if (cloudEnabled) pullCloud(); }, [cloudEnabled, pullCloud]);
   useEffect(() => {
@@ -4715,25 +4767,17 @@ function App() {
       if (gistId) {
         const cloud = await Da.cloudRead(token, gistId);
         if (cloud && cloud.events && cloud.events.length) {
-          const useCloud = confirm("检测到云端已有日程数据。\n\n「确定」= 用云端数据覆盖本机（在新设备上请选这个）\n「取消」= 用本机数据覆盖云端");
+          const useCloud = confirm("检测到云端已有日程数据。\n\n「确定」= 用云端数据覆盖本机（在新设备上请选这个）\n「取消」= 保留本机数据，稍后手动同步");
           if (useCloud) {
             const merged = Da.mergeCloud(base, cloud);
             const p = Da.cloudPayload(merged); delete p.updatedAt;
             syncRef.current.lastJson = JSON.stringify(p);
             setState(merged);
           } else {
-            const payload = { ...Da.cloudPayload(base), updatedAt: Date.now() };
-            await Da.cloudWrite(token, gistId, payload);
-            const p = { ...payload }; delete p.updatedAt;
+            // 保留本机数据，不覆盖云端（下次内容变化时自动同步）
+            const p = Da.cloudPayload(base); delete p.updatedAt;
             syncRef.current.lastJson = JSON.stringify(p);
-            setState({ ...base, updatedAt: payload.updatedAt });
-          }
-        } else {
-          const payload = { ...Da.cloudPayload(base), updatedAt: Date.now() };
-          await Da.cloudWrite(token, gistId, payload);
-          const p = { ...payload }; delete p.updatedAt;
-          syncRef.current.lastJson = JSON.stringify(p);
-          setState({ ...base, updatedAt: payload.updatedAt });
+            setState({ ...base });
         }
       } else {
         const payload = { ...Da.cloudPayload(base), updatedAt: Date.now() };
