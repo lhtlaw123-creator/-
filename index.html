@@ -98,6 +98,13 @@ input, textarea { font-family: inherit; }
 
 .brand-name { font-family: var(--font-display); font-size: 19px; font-weight: 700; letter-spacing: 0.5px; white-space: nowrap; }
 .brand-sub { font-size: 11.5px; color: var(--ink-3); margin-top: 1px; letter-spacing: 0.3px; }
+.user-chip {
+  display: inline-flex; align-items: center; gap: 7px; min-width: 0; max-width: 170px;
+  padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--r-pill);
+  background: var(--surface); color: var(--ink-2); font-size: 12px; font-weight: 700;
+}
+.user-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-chip i { width: 7px; height: 7px; border-radius: 50%; background: oklch(0.67 0.15 150); flex-shrink: 0; }
 
 .spacer { flex: 1; }
 
@@ -139,10 +146,26 @@ input, textarea { font-family: inherit; }
 .sidebar {
   width: 248px; flex-shrink: 0; border-right: 1px solid var(--line);
   background: var(--surface-2); overflow-y: auto; padding: 18px 16px 30px;
+  display: flex; flex-direction: column;
   transition: width 0.3s var(--ease), opacity 0.3s var(--ease);
 }
 .sidebar.collapsed { width: 0; padding: 0; opacity: 0; overflow: hidden; }
 .calwrap { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.sidebar-tools { margin-top: auto; padding-top: 24px; }
+.sidebar-tool-btn {
+  width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 11px;
+  border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface);
+  color: var(--ink); font-size: 13px; font-weight: 700; box-shadow: var(--shadow-sm);
+}
+.sidebar-tool-btn:hover { background: var(--bg-soft); box-shadow: var(--shadow-md); }
+.sidebar-tool-btn span { flex: 1; text-align: left; }
+
+.gpa-overlay { position: fixed; inset: 0; z-index: 160; background: var(--surface); display: flex; flex-direction: column; }
+.gpa-head {
+  height: 54px; flex-shrink: 0; padding: 0 14px; border-bottom: 1px solid var(--line);
+  background: var(--surface); display: flex; align-items: center; gap: 10px;
+}
+.gpa-frame { width: 100%; flex: 1; min-height: 0; border: 0; background: #f8fafc; }
 
 /* 倒计时卡 */
 .side-title { font-size: 11.5px; font-weight: 700; color: var(--ink-3); letter-spacing: 1px; text-transform: uppercase; margin: 22px 6px 10px; display: flex; align-items: center; justify-content: space-between; }
@@ -643,22 +666,28 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
 }
 
 @media (max-width: 760px) {
-  .sidebar { position: fixed; z-index: 50; height: 100vh; box-shadow: var(--shadow-lg); left: -100vw; width: 100vw; transition: left 0.3s var(--ease); }
+  .sidebar { position: fixed; z-index: 50; top: 119px; bottom: 0; height: calc(100dvh - 119px); box-shadow: var(--shadow-lg); left: -100vw; width: 100vw; transition: left 0.3s var(--ease); }
   .sidebar:not(.collapsed) { left: 0; }
   .period-label { min-width: auto; }
   .brand-sub { display: none; }
 
-  /* 顶栏压缩 */
-  .topbar { padding: 9px 10px; gap: 5px; }
-  .brand { gap: 6px; }
-  .brand-mark { width: 26px; height: 26px; border-radius: 8px; }
-  
-  .brand-name { font-size: 15px; }
-  .segment button { padding: 5px 11px; font-size: 12px; }
+  /* 顶栏分行，避免手机端控件和文字互相覆盖 */
+  .topbar { padding: 7px 8px 8px; gap: 5px; flex-wrap: wrap; align-content: flex-start; }
+  .topbar > .brand { display: none; }
+  .topbar > .spacer { display: none; }
+  .topbar > .user-chip { order: 1; flex: 1; max-width: none; height: 30px; padding: 4px 9px; }
+  .topbar > button:first-child { order: 0; }
+  .topbar > button[title="设置"], .topbar > button[title="退出登录"] { order: 2; }
+  .topbar > .nav-group { order: 3; width: 100%; justify-content: space-between; margin-left: 0 !important; }
+  .topbar > .segment { order: 4; flex: 1; }
+  .topbar > .btn-ai { order: 4; }
+  .topbar > button[title="每周规划"], .topbar > button[title="学习统计"], .topbar > button[title="分析报告"] { order: 5; }
+  .topbar > button[title="每周规划"] { margin-left: auto; }
+  .segment button { flex: 1; padding: 5px 10px; font-size: 12px; }
   .btn { padding: 6px 11px; font-size: 12px; }
   .btn-ai { padding: 5px 10px; font-size: 11.5px; }
   .icon-btn { width: 30px; height: 30px; font-size: 15px; }
-  .period-label { font-size: 15px; }
+  .period-label { font-size: 14px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .btn-today { padding: 5px 10px; font-size: 12px; }
 
   /* 日历网格缩小 */
@@ -682,7 +711,11 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
 
   /* 模态/抽屉全宽 */
   .modal { width: 96vw; max-width: 96vw; border-radius: var(--r-lg); }
-  .modal-head { padding: 16px 18px 12px; }
+  .modal-head { padding: 12px; flex-wrap: wrap; gap: 6px; }
+  .modal-head .modal-title { flex: 1; min-width: 140px; }
+  .modal-head .cycle-seg { order: 3; margin-left: 0 !important; }
+  .modal-head > .spacer { display: none; }
+  .modal-head .btn { white-space: normal; text-align: center; justify-content: center; }
   .modal-title { font-size: 18px; }
   .modal-body { padding: 16px 18px 22px; }
   .drawer { width: 100vw; max-width: 100vw; border-radius: var(--r-lg) var(--r-lg) 0 0; top: auto; bottom: 0; height: 92vh; }
@@ -706,6 +739,31 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
   .rv-kpis b { font-size: 18px; }
   .rv-month-name { font-size: 14px; width: 36px; }
   .rv-week-label { width: 90px; font-size: 11.5px; }
+  .report-sheet { min-width: 0; overflow: hidden; }
+  .rep-header { display: block; gap: 0; padding-bottom: 12px; margin-bottom: 14px; }
+  .rep-title { font-size: 21px; overflow-wrap: anywhere; }
+  .rep-score { margin-top: 12px; display: inline-flex; }
+  .rep-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  .rep-kpis > div { padding: 10px; min-width: 0; }
+  .rep-kpis b { font-size: 19px; }
+  .rep-cols { grid-template-columns: 1fr; gap: 10px; }
+  .rep-section p, .rep-section li, .rep-subj-comment, .rep-si-comment { overflow-wrap: anywhere; }
+  .rep-daily-chart { gap: 2px; overflow-x: auto; padding-bottom: 24px; margin-bottom: 4px; }
+  .rep-daily-bar { min-width: 9px; }
+  .rep-daily-bar .rep-daily-label { font-size: 8px; writing-mode: vertical-rl; bottom: -25px; }
+  .rep-compare-row { display: grid; grid-template-columns: 60px minmax(0, 1fr); gap: 6px; }
+  .rep-compare-label { width: 60px; font-size: 11px; }
+  .rep-compare-fig { grid-column: 2; width: auto; text-align: right; margin-top: -4px; }
+  .rep-subj-top { flex-wrap: wrap; }
+  .rep-subj-fig { width: 100%; margin-left: 0; }
+  .rep-subitems { margin-left: 0; padding-left: 8px; }
+  .rep-subitem { display: grid; grid-template-columns: minmax(70px, 1fr) 70px 42px; gap: 5px; }
+  .rep-si-name { width: auto; overflow-wrap: anywhere; }
+  .rep-si-bar { grid-column: 1 / -1; width: 100%; flex: none; }
+  .rep-si-fig, .rep-si-pct { width: auto; text-align: left; }
+  .rep-si-comment { grid-column: 1 / -1; min-width: 0; }
+  .drawer-foot { flex-wrap: wrap; gap: 7px; }
+  .drawer-foot .spacer { display: none; }
 
   /* 浮动按钮调整 */
   .fab-stack { right: 14px; bottom: 18px; gap: 12px; }
@@ -718,9 +776,11 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
   .ai-bubble { font-size: 13px; }
 
   /* 登录卡片 */
-  .login-card { padding: 32px 22px 28px; width: 92vw; }
+  .login-overlay { align-items: flex-start; overflow-y: auto; padding: max(18px, env(safe-area-inset-top)) 12px max(18px, env(safe-area-inset-bottom)); }
+  .login-card { padding: 26px 22px 24px; width: 100%; max-width: 420px; margin: auto 0; gap: 14px; }
   .login-title { font-size: 20px; }
   .login-avatar { width: 56px; height: 56px; }
+  .login-btn, .login-toggle { min-height: 44px; }
   
   .input { font-size: 16px; padding: 10px 12px; }
 
@@ -746,7 +806,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
 .login-overlay {
   position: fixed; inset: 0; z-index: 9999;
   background: linear-gradient(160deg, #fbf9f6 0%, #f4f1ec 100%);
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: center; justify-content: center; overflow-y: auto;
 }
 .login-card {
   background: var(--surface);
@@ -781,6 +841,10 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
 .login-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 .login-toggle { font-size: 12.5px; color: var(--ink-3); cursor: pointer; user-select: none; transition: color 0.15s; }
 .login-toggle:hover { color: var(--accent-ink); }
+.login-toggle {
+  width: 100%; padding: 8px; background: transparent; border: 0;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
 
 </style>
 </head>
@@ -808,7 +872,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
   const PASSHASH_KEY = "beikao-cal-passhash";
   const DEFAULT_PASSHASH = "4bfcc619ba0c4f0c5785de73cc29b94bbc102534fe4ece861c294ec305e105b5"; // tt123456
   const USERS_KEY = "beikao-cal-users";
-  const ADMIN_API_KEY = "";
+  const ADMIN_API_KEY = "sk-eda11c9a10214e68a6fdbd1c66d9f1eb";
   const SYNC_TOKEN = "Z2hwX2tnQ3J2TGljdmhMdG5DUXlVaWo2MHVhQ2VmVjVhVzNSQUZieA=="; // admin 云同步 token（base64编码，非明文）
 
   // 按用户隔离数据（不同账号独立数据）
@@ -1063,6 +1127,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     var u = getUsers().find(function(x) { return x.username === username; });
     return !u || u.role === "admin" || u.aiEnabled !== false;
   }
+  function hasBundledAIKey() { return !!ADMIN_API_KEY; }
   function getPasswordHash() {
     try {
       const users = getUsers();
@@ -1092,11 +1157,56 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     return true;
   }
   function sha256(str) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(str);
-    return crypto.subtle.digest("SHA-256", data).then(function(hash) {
-      return Array.from(new Uint8Array(hash)).map(function(b) { return b.toString(16).padStart(2, "0"); }).join("");
-    });
+    if (typeof crypto !== "undefined" && crypto.subtle && typeof TextEncoder !== "undefined") {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(str);
+      return crypto.subtle.digest("SHA-256", data).then(function(hash) {
+        return Array.from(new Uint8Array(hash)).map(function(b) { return b.toString(16).padStart(2, "0"); }).join("");
+      });
+    }
+    return Promise.resolve(sha256Fallback(unescape(encodeURIComponent(str))));
+  }
+  function sha256Fallback(ascii) {
+    var mathPow = Math.pow, maxWord = mathPow(2, 32), result = "", words = [];
+    var asciiBitLength = ascii.length * 8, hash = [], k = [], primeCounter = 0, isComposite = {};
+    var i, j;
+    for (var candidate = 2; primeCounter < 64; candidate++) {
+      if (!isComposite[candidate]) {
+        for (i = 0; i < 313; i += candidate) isComposite[i] = candidate;
+        hash[primeCounter] = (mathPow(candidate, 0.5) * maxWord) | 0;
+        k[primeCounter++] = (mathPow(candidate, 1 / 3) * maxWord) | 0;
+      }
+    }
+    ascii += "\x80";
+    while (ascii.length % 64 - 56) ascii += "\x00";
+    for (i = 0; i < ascii.length; i++) words[i >> 2] |= ascii.charCodeAt(i) << ((3 - i) % 4) * 8;
+    words[words.length] = (asciiBitLength / maxWord) | 0;
+    words[words.length] = asciiBitLength;
+
+    for (j = 0; j < words.length;) {
+      var w = words.slice(j, j += 16), oldHash = hash.slice(0), a = hash.slice(0, 8);
+      for (i = 0; i < 64; i++) {
+        var w15 = w[i - 15], w2 = w[i - 2];
+        var s0 = i < 16 ? 0 : ((w15 >>> 7 | w15 << 25) ^ (w15 >>> 18 | w15 << 14) ^ (w15 >>> 3));
+        var s1 = i < 16 ? 0 : ((w2 >>> 17 | w2 << 15) ^ (w2 >>> 19 | w2 << 13) ^ (w2 >>> 10));
+        w[i] = i < 16 ? w[i] : (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+        var e = a[4], ch = (e & a[5]) ^ (~e & a[6]);
+        var temp1 = (a[7] + ((e >>> 6 | e << 26) ^ (e >>> 11 | e << 21) ^ (e >>> 25 | e << 7)) + ch + k[i] + w[i]) | 0;
+        var maj = (a[0] & a[1]) ^ (a[0] & a[2]) ^ (a[1] & a[2]);
+        var temp2 = (((a[0] >>> 2 | a[0] << 30) ^ (a[0] >>> 13 | a[0] << 19) ^ (a[0] >>> 22 | a[0] << 10)) + maj) | 0;
+        a = [(temp1 + temp2) | 0].concat(a);
+        a[4] = (a[4] + temp1) | 0;
+        a.length = 8;
+      }
+      for (i = 0; i < 8; i++) hash[i] = (a[i] + oldHash[i]) | 0;
+    }
+    for (i = 0; i < 8; i++) {
+      for (j = 3; j + 1; j--) {
+        var b = hash[i] >> (j * 8) & 255;
+        result += (b < 16 ? "0" : "") + b.toString(16);
+      }
+    }
+    return result;
   }
   function isLoggedIn() {
     doLogout(); // 每次打开页面清除登录状态，强制重新登录
@@ -1459,7 +1569,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
     if (!isAdminUser && provider === "auto" && !(typeof window !== "undefined" && window.claude && window.claude.complete)) prov = "deepseek";
 
     var preset = AI_PRESETS[prov] || AI_PRESETS.deepseek;
-    var apiKey = (isAdminUser ? settings.apiKey : (adminSettings.apiKey || ADMIN_API_KEY) || "").trim();
+    var apiKey = (isAdminUser ? (settings.apiKey || ADMIN_API_KEY) : (adminSettings.apiKey || ADMIN_API_KEY) || "").trim();
     var base = (((isAdminUser ? settings.aiBaseUrl : adminSettings.aiBaseUrl) || preset.base) || "").replace(/\/+$/, "");
     var model = ((isAdminUser ? settings.aiModel : adminSettings.aiModel) || "").trim();
     if (!model && prov === "deepseek") model = (mode === "analysis") ? (preset.analysisModel || "deepseek-v4-pro") : (preset.chatModel || "deepseek-v4-flash");
@@ -1727,7 +1837,7 @@ textarea.input { resize: vertical; min-height: 60px; line-height: 1.55; }
 
   window.CalData = {
     KEY, LOGIN_KEY, USERS_KEY, PASSHASH_KEY, DEFAULT_PASSHASH, SYNC_TOKEN,
-    getUsers, saveUsers, getPasswordHash, setPasswordHash, changePassword,
+    getUsers, saveUsers, getPasswordHash, setPasswordHash, changePassword, hasBundledAIKey,
     isLoggedIn, doLogin, doRegister, getLoggedInUser, isAdmin, doLogout,
     defaultState, load, save, reset, defaultSubjects, GROUP_ORDER, subjColors,
     iso, parseISO, today, addDays, dow, startOfWeek, startOfMonth, endOfMonth, daysBetween,
@@ -2446,7 +2556,7 @@ function MemoBox({ memos, onChange }) {
 }
 
 /* ---------- 侧边栏 ---------- */
-function Sidebar({ collapsed, state, setState, anchor, onManageCountdown, onReviewSubject, toggleSubject, viewAsUser, onViewAsUser }) {
+function Sidebar({ collapsed, state, setState, anchor, onManageCountdown, onReviewSubject, toggleSubject, viewAsUser, onViewAsUser, onOpenGPA }) {
   const { subjects, events, settings } = state;
   const weekFrom = Db.startOfWeek(anchor), weekTo = Db.addDays(weekFrom, 6);
   const { map } = useMemo(() => Db.rangeStats(events, subjects, weekFrom, weekTo), [events, subjects, weekFrom]);
@@ -2506,6 +2616,14 @@ function Sidebar({ collapsed, state, setState, anchor, onManageCountdown, onRevi
           })}
         </div>
       ))}
+      <div className="sidebar-tools">
+        <div className="side-title">学习工具</div>
+        <button className="sidebar-tool-btn" onClick={onOpenGPA}>
+          <Icon name="chart" size={17} />
+          <span>学分绩点计算器</span>
+          <Icon name="next" size={13} />
+        </button>
+      </div>
     </div>
   );
 }
@@ -3874,60 +3992,15 @@ function ReportModal({ state, setState, onClose, anchor, toast, onOpenAI }) {
     try {
     if (!analysis || exporting) return;
     setExporting(true); setExportErr("");
-    var expSteps = [
-      { text: "生成报告框架", status: "done" },
-      { text: "评估整体学习情况", status: "active" },
-      { text: "逐科撰写正式分析（共" + rows.length + "科）", status: "pending" },
-      { text: "梳理亮点与不足", status: "pending" },
-      { text: "制定改进措施与建议", status: "pending" },
-      { text: "排版导出 Word 文档", status: "pending" },
-    ];
-    setProgress({ steps: expSteps, current: 0, thinking: "正在生成 Word 报告…" });
-    var timer2 = setInterval(function() {
-      setProgress(function(p) {
-        if (!p || !p.steps) return p;
-        var nx = p.current + 1;
-        if (nx >= p.steps.length) { clearInterval(timer2); return p; }
-        var ns = p.steps.map(function(s, i) {
-          if (i < nx) return { text: s.text, status: "done" };
-          if (i === nx) return { text: s.text, status: "active" };
-          return s;
-        });
-        var th = [
-          "正在生成 Word 报告…",
-          "正在评估整体学习情况…",
-          rows.length > 0 ? "正在撰写「" + rows[Math.min(nx-2, rows.length-1)].name + "」的正式分析…" : "正在逐科分析…",
-          "正在梳理亮点与不足…",
-          "正在制定改进措施…",
-          "正在排版导出…",
-        ];
-        return { steps: ns, current: nx, thinking: th[Math.min(nx, th.length-1)] || "处理中…" };
-      });
-    }, 700);
-
-    let deepAnalysis = null;
-    if (Dr.aiAvailable(state)) {
-      try {
-        const deepRaw = await Dr.aiComplete(buildDeepReportPrompt(rows, gathered.map, gathered.days, gathered.label, gathered.from, gathered.to), state.settings, "analysis");
-        deepAnalysis = window.parseJSONLoose(deepRaw);
-        if (!deepAnalysis || !deepAnalysis.subjects) deepAnalysis = null;
-      } catch (e) {
-        setExportErr("AI 深度分析失败，使用基础报告导出。");
-      }
-    }
-    clearInterval(timer2);
-    if (!deepAnalysis) deepAnalysis = analysis;
-    // 标记完成
-    setProgress({ steps: expSteps.map(function(s) { return { text: s.text, status: "done" }; }), current: expSteps.length, thinking: "✓ 正在生成文件…" });
-
-    const wordHTML = generateWordHTML(deepAnalysis, rows, state, gathered, totDone, totTarget, activeDays);
+    const wordHTML = generateWordHTML(analysis, rows, state, gathered, totDone, totTarget, activeDays);
     const blob = new Blob(['﻿' + wordHTML], { type: 'application/msword;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = '备考日历_' + gathered.label + '学习分析报告_' + gathered.from + '_' + gathered.to + '.doc';
+    a.style.display = "none";
     document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(function() { URL.revokeObjectURL(url); }, 2000);
+    setTimeout(function() { URL.revokeObjectURL(url); }, 10000);
     setExporting(false);
     toast && toast('报告已导出为 Word 文档（.doc），可用 Microsoft Word 或 WPS 打开');
     } catch(e) { console.error("exportWord error:", e); setExporting(false); setExportErr("导出失败：" + (e.message || e)); }
@@ -4180,6 +4253,24 @@ function useToast() {
   return [show, node];
 }
 
+function GPAOverlay({ onClose }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div className="gpa-overlay">
+      <div className="gpa-head">
+        <Icon name="chart" size={18} />
+        <div className="font-display" style={{ fontSize: 17, fontWeight: 700, flex: 1 }}>学分绩点计算器</div>
+        <button className="icon-btn" title="关闭学分绩点计算器" onClick={onClose}><Icon name="close" /></button>
+      </div>
+      <iframe className="gpa-frame" src="./gpa.html" title="学分绩点计算器" />
+    </div>
+  );
+}
+
 function SettingsDrawer({ settings, onSave, onClose, onReset, onExport, onExportBackup, onImportBackup, cloudEnabled, syncStatus, onConnectCloud, onDisconnectCloud, onSyncNow }) {
   const isAdminUser = Da.isAdmin();
   const [show, setShow] = useState(false);
@@ -4224,9 +4315,10 @@ function SettingsDrawer({ settings, onSave, onClose, onReset, onExport, onExport
   const prov = d.aiProvider || "auto";
   const preset = Da.AI_PRESETS[prov === "auto" ? "anthropic" : prov] || Da.AI_PRESETS.anthropic;
   const needKey = !(prov === "auto" && inClaude);
+  const hasKey = !!(d.apiKey || (Da.hasBundledAIKey && Da.hasBundledAIKey()));
   const aiStatus = (prov === "auto" && inClaude)
     ? "✓ 当前在 Claude 环境，AI 已可用"
-    : (d.apiKey ? "✓ 已配置 Key，AI 可用" : "未填写 Key：AI 排课不可用，报告会用本地分析");
+    : (hasKey ? "✓ 已配置 Key，AI 可用" : "未填写 Key：AI 排课不可用，报告会用本地分析");
 
   return (
     <React.Fragment>
@@ -4255,7 +4347,7 @@ function SettingsDrawer({ settings, onSave, onClose, onReset, onExport, onExport
             {isAdminUser ? (
               <React.Fragment>
             <div style={{ background: "var(--bg-soft)", borderRadius: "var(--r-md)", padding: "10px 13px", marginBottom: 12, display: "flex", alignItems: "center", gap: 9 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 99, background: (prov === "auto" && inClaude) || d.apiKey ? "oklch(0.7 0.16 150)" : "var(--ink-3)", flexShrink: 0 }} />
+              <span style={{ width: 8, height: 8, borderRadius: 99, background: (prov === "auto" && inClaude) || hasKey ? "oklch(0.7 0.16 150)" : "var(--ink-3)", flexShrink: 0 }} />
               <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
                 {aiStatus}
               </span>
@@ -4520,14 +4612,14 @@ function LoginScreen({ onLogin }) {
             <button type="button" className="login-btn" onClick={handleLogin} disabled={busy}>
               {busy ? "验证中…" : "登 录"}
             </button>
-            <span className="login-toggle" onClick={() => switchMode("register")}>还没有账号？注册一个新账号</span>
+            <button type="button" className="login-toggle" onClick={() => switchMode("register")}>还没有账号？注册一个新账号</button>
           </React.Fragment>
         ) : (
           <React.Fragment>
             <button type="button" className="login-btn" onClick={handleRegister} disabled={busy}>
               {busy ? "注册中…" : "注 册"}
             </button>
-            <span className="login-toggle" onClick={() => switchMode("login")}>已有账号？返回登录</span>
+            <button type="button" className="login-toggle" onClick={() => switchMode("login")}>已有账号？返回登录</button>
           </React.Fragment>
         )}
       </div>
@@ -4554,10 +4646,11 @@ function App() {
   const [showAI, setShowAI] = useState(false);
   const [showPlanner, setShowPlanner] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [showGPA, setShowGPA] = useState(false);
   const [showCountdownMgr, setShowCountdownMgr] = useState(false);
   const [reviewSubject, setReviewSubject] = useState(null);
   const [viewAsUser, setViewAsUser] = useState(null); // 管理员查看其他用户
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => typeof window !== "undefined" && window.innerWidth <= 760);
   const [toast, toastNode] = useToast();
   const [syncStatus, setSyncStatus] = useState("idle"); // idle | syncing | ok | error
   const [showSyncPrompt, setShowSyncPrompt] = useState(false);
@@ -4832,6 +4925,10 @@ function App() {
             <div className="brand-sub">规划每一天 · 看见每一分</div>
           </div>
         </div>
+        <div className="user-chip" title={"当前用户：" + ((Da.getLoggedInUser() || {}).username || "未知用户")}>
+          <i />
+          <span>{viewAsUser ? "管理：" + viewAsUser : "当前用户：" + ((Da.getLoggedInUser() || {}).username || "未知用户")}</span>
+        </div>
 
         <div className="nav-group" style={{ marginLeft: 8 }}>
           <button className="btn btn-today" onClick={() => setAnchor(Da.today())}>今天</button>
@@ -4859,7 +4956,8 @@ function App() {
         <Sidebar collapsed={collapsed} state={state} setState={setState} anchor={anchor} viewAsUser={viewAsUser} onViewAsUser={(u) => { if (u) { if (viewAsUser) { try { localStorage.setItem(Da.KEY + "-" + viewAsUser, JSON.stringify(state)); } catch(e) {} } else { Da.save(state); } var raw = localStorage.getItem(Da.KEY + "-" + u); if (raw) { try { var d = JSON.parse(raw); if (d && Array.isArray(d.subjects) && Array.isArray(d.events)) { d.settings = Object.assign({}, state.settings, d.settings || {}); setState(d); stateRef.current = d; setViewAsUser(u); return; } } catch(e) {} } try { var cache = localStorage.getItem("_beikao-cloud-cache"); if (cache) { var users = JSON.parse(cache); if (users[u] && Array.isArray(users[u].subjects) && Array.isArray(users[u].events)) { var cd = users[u]; cd.settings = Object.assign({}, state.settings, cd.settings || {}); setState(cd); stateRef.current = cd; setViewAsUser(u); return; } } } catch(e2) {} toast("该用户暂无数据，请先同步云端"); } else { if (viewAsUser) { try { localStorage.setItem(Da.KEY + "-" + viewAsUser, JSON.stringify(state)); } catch(e) {} } setViewAsUser(null); var s = Da.load(); if (s && Array.isArray(s.subjects) && Array.isArray(s.events)) { setState(s); stateRef.current = s; } } }}
           onManageCountdown={() => setShowCountdownMgr(true)}
           onReviewSubject={(id) => setReviewSubject(id)}
-          toggleSubject={toggleSubject} />
+          toggleSubject={toggleSubject}
+          onOpenGPA={() => { setShowGPA(true); if (window.innerWidth <= 760) setCollapsed(true); }} />
         <div className="calwrap">
           <MottoBar motto={state.settings.motto} onChange={(motto) => setState((s) => ({ ...s, settings: { ...s.settings, motto } }))} />
           {view === "month" && <MonthView {...viewProps} />}
@@ -4892,6 +4990,7 @@ function App() {
       {showStats && <StatsModal events={state.events} subjects={state.subjects} settings={state.settings} anchor={anchor} onClose={() => setShowStats(false)} />}
       {showPlanner && <WeeklyPlanner state={state} setState={setState} toast={toast} initialWeek={Da.weekKey(anchor)} onClose={() => setShowPlanner(false)} />}
       {showReport && <ReportModal state={state} setState={setState} anchor={anchor} toast={toast} onClose={() => setShowReport(false)} onOpenAI={(analysis) => { setShowReport(false); setShowAI(true); window._reportContext = analysis; }} />}
+      {showGPA && <GPAOverlay onClose={() => setShowGPA(false)} />}
       {showCountdownMgr && <CountdownManager countdowns={state.countdowns}
         onChange={(countdowns) => setState((s) => ({ ...s, countdowns }))}
         onClose={() => setShowCountdownMgr(false)} />}
